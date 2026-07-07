@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from html import escape
 from pathlib import Path
+from textwrap import dedent
 from typing import Any
 
 import streamlit as st
@@ -11,9 +12,14 @@ from src.survey_dashboard import REPORT_PDF, REPORT_PNG, get_public_survey, pct
 BASE_DIR = Path(__file__).resolve().parent
 
 
+def html_block(markup: str) -> str:
+    return dedent(markup).strip()
+
+
 def apply_page_style() -> None:
     st.markdown(
-        """
+        html_block(
+            """
         <style>
         :root {
             --bg: #070a12;
@@ -443,19 +449,22 @@ def apply_page_style() -> None:
             }
         }
         </style>
-        """,
+        """
+        ),
         unsafe_allow_html=True,
     )
 
 
 def metric_card(label: str, value: str, note: str) -> str:
-    return f"""
+    return html_block(
+        f"""
     <article class="metric-card">
         <div class="metric-label">{escape(label)}</div>
         <div class="metric-value">{escape(value)}</div>
         <div class="metric-note">{escape(note)}</div>
     </article>
     """
+    )
 
 
 def bar_rows(items: list[tuple[str, int]], total: int) -> str:
@@ -466,19 +475,22 @@ def bar_rows(items: list[tuple[str, int]], total: int) -> str:
     for label, value in items:
         width = max(5, round(value / max_value * 100))
         rows.append(
-            f"""
+            html_block(
+                f"""
             <div class="bar-row">
                 <div class="bar-label">{escape(label)}</div>
                 <div class="bar-track"><div class="bar-fill" style="width:{width}%"></div></div>
                 <div class="bar-value">{value}명 · {pct(value, total)}</div>
             </div>
             """
+            )
         )
     return "\n".join(rows)
 
 
 def panel(title: str, subtitle: str, items: list[tuple[str, int]], total: int) -> str:
-    return f"""
+    return html_block(
+        f"""
     <section class="panel">
         <div class="panel-title">
             <span>{escape(title)}</span>
@@ -487,6 +499,7 @@ def panel(title: str, subtitle: str, items: list[tuple[str, int]], total: int) -
         {bar_rows(items, total)}
     </section>
     """
+    )
 
 
 def render_download_button(path: Path, label: str, file_name: str, mime: str) -> None:
@@ -504,13 +517,17 @@ def render_download_button(path: Path, label: str, file_name: str, mime: str) ->
 
 def render_downloads() -> None:
     st.markdown(
-        """
+        html_block(
+            """
         <section class="panel">
             <div class="panel-title">
                 <span>공유 자료</span>
                 <small>집계본만 제공</small>
             </div>
-        """,
+            <div class="download-note">개별 응답과 원본 대화는 공개하지 않고, 집계 결과만 표시합니다.</div>
+        </section>
+        """
+        ),
         unsafe_allow_html=True,
     )
     left, right = st.columns(2)
@@ -518,10 +535,6 @@ def render_downloads() -> None:
         render_download_button(REPORT_PDF, "PDF 내려받기", "jeju-student-survey-report.pdf", "application/pdf")
     with right:
         render_download_button(REPORT_PNG, "PNG 내려받기", "jeju-student-survey-report.png", "image/png")
-    st.markdown(
-        '<div class="download-note">개별 응답과 원본 대화는 공개하지 않고, 집계 결과만 표시합니다.</div></section>',
-        unsafe_allow_html=True,
-    )
 
 
 def render_survey_dashboard() -> None:
@@ -541,7 +554,8 @@ def render_survey_dashboard() -> None:
         warning = f'<div class="warning">{escape(survey["error"])}로 인해 저장된 CSV 기준 결과를 표시합니다.</div>'
 
     st.markdown(
-        f"""
+        html_block(
+            f"""
         <main class="cyber-shell">
             <section class="hero">
                 <div class="kicker">Jeju Exchange Survey // Live Report</div>
@@ -594,7 +608,8 @@ def render_survey_dashboard() -> None:
             </section>
         </main>
         <div class="spacer"></div>
-        """,
+        """
+        ),
         unsafe_allow_html=True,
     )
     render_downloads()
