@@ -1,0 +1,11 @@
+secrets/
+*.credentials.json
+google-service-account.json
+.venv/
+__pycache__/
+*.pyc
+tmp/
+.env
+.streamlit/secrets.toml
+.agents/
+.codex/
