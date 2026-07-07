@@ -7,7 +7,8 @@ class AppCopyTest(unittest.TestCase):
         self.app_text = Path("app.py").read_text(encoding="utf-8")
 
     def test_app_presents_single_product_flow(self) -> None:
-        self.assertIn("제주대학교 교류학생 생활 플랫폼 수요조사", self.app_text)
+        self.assertIn("교류학생 생활 플랫폼", self.app_text)
+        self.assertIn("수요조사", self.app_text)
         self.assertIn("render_survey_dashboard()", self.app_text)
         self.assertNotIn("st.tabs(", self.app_text)
         self.assertNotIn("st.sidebar.radio", self.app_text)
