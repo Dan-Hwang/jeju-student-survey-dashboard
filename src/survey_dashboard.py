@@ -74,7 +74,10 @@ def load_credentials_from_secrets() -> Path | None:
         return None
     target = Path(os.getenv("TMP", str(BASE_DIR / "tmp"))) / "ara-guide-google-service-account.json"
     target.parent.mkdir(parents=True, exist_ok=True)
-    data: dict[str, Any] = json.loads(raw_json)
+    try:
+        data: dict[str, Any] = json.loads(raw_json)
+    except json.JSONDecodeError:
+        return None
     target.write_text(json.dumps(data), encoding="utf-8")
     return target
 
