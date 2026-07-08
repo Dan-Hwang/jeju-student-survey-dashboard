@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from html import escape
 from pathlib import Path
+from typing import Any
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 from src.survey_dashboard import REPORT_PDF, REPORT_PNG, get_public_survey, pct
 
@@ -19,8 +22,9 @@ def apply_page_style() -> None:
     --ara-line: #dbe4ef;
     --ara-blue: #2563eb;
     --ara-teal: #0f766e;
-    --ara-mint: #ccfbf1;
-    --ara-yellow: #facc15;
+    --ara-sky: #0ea5e9;
+    --ara-green: #16a34a;
+    --ara-orange: #f97316;
 }
 
 html, body, [data-testid="stAppViewContainer"], .stApp {
@@ -29,8 +33,8 @@ html, body, [data-testid="stAppViewContainer"], .stApp {
 }
 
 .main .block-container {
-    max-width: 760px;
-    padding: 1.1rem 1rem 4rem;
+    max-width: 880px;
+    padding: 1rem 1rem 4rem;
 }
 
 [data-testid="stHeader"], footer, #MainMenu {
@@ -43,7 +47,7 @@ h1, h2, h3, p {
 }
 
 h1 {
-    font-size: clamp(2rem, 9vw, 3.35rem) !important;
+    font-size: clamp(1.85rem, 8vw, 3rem) !important;
     line-height: 1.15 !important;
     margin-bottom: 0.65rem !important;
 }
@@ -67,7 +71,7 @@ p, li, .stMarkdown, [data-testid="stCaptionContainer"] {
 
 div[data-testid="stVerticalBlockBorderWrapper"] {
     border-color: var(--ara-line);
-    border-radius: 18px;
+    border-radius: 20px;
     background: var(--ara-card);
     box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
 }
@@ -128,7 +132,7 @@ section[data-testid="stSidebar"] {
 
 @media (max-width: 640px) {
     .main .block-container {
-        padding: 0.75rem 0.75rem 3.4rem;
+        padding: 0.7rem 0.7rem 3.4rem;
     }
 
     div[data-testid="stVerticalBlockBorderWrapper"] {
@@ -154,6 +158,303 @@ def get_count(items: list[tuple[str, int]], label: str, default: int = 0) -> int
     return dict(items).get(label, default)
 
 
+def render_html(html: str, height: int) -> None:
+    components.html(html, height=height, scrolling=False)
+
+
+def chart_theme() -> str:
+    return """
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    color: #172033;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: transparent;
+}
+
+.chart-card {
+    width: 100%;
+    border: 1px solid #dbe4ef;
+    border-radius: 20px;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,252,0.96)),
+        #ffffff;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.055);
+    padding: clamp(16px, 4vw, 24px);
+}
+
+.chart-kicker {
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0;
+    margin-bottom: 8px;
+}
+
+.summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.summary-card {
+    min-height: 126px;
+    border-radius: 18px;
+    padding: 16px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    position: relative;
+    overflow: hidden;
+}
+
+.summary-card::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 5px;
+    height: 100%;
+    background: linear-gradient(180deg, #2563eb, #0f766e);
+}
+
+.summary-label {
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.summary-value {
+    margin-top: 10px;
+    color: #172033;
+    font-size: clamp(23px, 6vw, 33px);
+    line-height: 1.1;
+    font-weight: 900;
+    overflow-wrap: anywhere;
+}
+
+.summary-note {
+    margin-top: 8px;
+    color: #0f766e;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+.bar-list {
+    display: grid;
+    gap: 14px;
+}
+
+.bar-row {
+    display: grid;
+    grid-template-columns: minmax(108px, 170px) 1fr minmax(86px, auto);
+    gap: 12px;
+    align-items: center;
+}
+
+.bar-label {
+    font-size: 15px;
+    font-weight: 800;
+    overflow-wrap: anywhere;
+}
+
+.bar-track {
+    height: 16px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e8eef5;
+}
+
+.bar-fill {
+    height: 100%;
+    min-width: 9px;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #2563eb, #0f766e);
+}
+
+.bar-value {
+    color: #475569;
+    font-size: 13px;
+    font-weight: 800;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.intent-layout {
+    display: grid;
+    grid-template-columns: 180px 1fr;
+    gap: 22px;
+    align-items: center;
+}
+
+.donut {
+    width: 168px;
+    aspect-ratio: 1;
+    border-radius: 50%;
+    background: conic-gradient(
+        #2563eb 0 var(--positive),
+        #f59e0b var(--positive) var(--neutral),
+        #ef4444 var(--neutral) 100%
+    );
+    position: relative;
+    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.05);
+}
+
+.donut::after {
+    content: attr(data-total);
+    position: absolute;
+    inset: 34px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: #ffffff;
+    color: #172033;
+    font-size: 24px;
+    font-weight: 900;
+}
+
+.legend {
+    display: grid;
+    gap: 12px;
+}
+
+.legend-row {
+    display: grid;
+    grid-template-columns: 12px 1fr auto;
+    gap: 10px;
+    align-items: center;
+}
+
+.dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+}
+
+.legend-label {
+    font-weight: 800;
+}
+
+.legend-value {
+    color: #475569;
+    font-size: 13px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+@media (max-width: 620px) {
+    .summary-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .summary-card {
+        min-height: 118px;
+        padding: 14px;
+    }
+
+    .bar-row {
+        grid-template-columns: 1fr;
+        gap: 6px;
+    }
+
+    .bar-value {
+        text-align: left;
+    }
+
+    .intent-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .donut {
+        width: min(180px, 58vw);
+        margin: 0 auto;
+    }
+}
+</style>
+"""
+
+
+def summary_cards_html(data: dict[str, Any], total: int) -> str:
+    pain = data["pain"]
+    openchat_find = data["openchat_find"]
+    top_pain = pain[0] if pain else ("-", 0)
+    top_openchat = openchat_find[0] if openchat_find else ("-", 0)
+    cards = [
+        ("전체 응답", f"{total}명", "실시간 집계 기준"),
+        ("4주 이상 체류", f"{int(data['stay_4weeks'])}명", pct(int(data["stay_4weeks"]), total)),
+        ("불편 1순위", str(top_pain[0]), f"{top_pain[1]}명"),
+        ("오픈채팅 1순위", str(top_openchat[0]), f"{top_openchat[1]}명"),
+    ]
+    card_markup = "\n".join(
+        f"""
+<article class="summary-card">
+    <div class="summary-label">{escape(label)}</div>
+    <div class="summary-value">{escape(value)}</div>
+    <div class="summary-note">{escape(note)}</div>
+</article>
+"""
+        for label, value, note in cards
+    )
+    return f"{chart_theme()}<section class='summary-grid'>{card_markup}</section>"
+
+
+def bar_chart_html(items: list[tuple[str, int]], total: int) -> str:
+    if not items:
+        return f"{chart_theme()}<section class='chart-card'>아직 표시할 응답이 없습니다.</section>"
+
+    max_value = max(value for _, value in items) or 1
+    rows = []
+    for label, value in items:
+        width = max(3, round(value / max_value * 100))
+        rows.append(
+            f"""
+<div class="bar-row">
+    <div class="bar-label">{escape(label)}</div>
+    <div class="bar-track"><div class="bar-fill" style="width:{width}%"></div></div>
+    <div class="bar-value">{value}명 · {pct(value, total)}</div>
+</div>
+"""
+        )
+    return f"{chart_theme()}<section class='chart-card'><div class='bar-list'>{''.join(rows)}</div></section>"
+
+
+def intent_chart_html(intent: list[tuple[str, int]], total: int) -> str:
+    values = dict(intent)
+    positive = values.get("긍정", 0)
+    neutral = values.get("중립", 0)
+    negative = values.get("부정", 0)
+    positive_end = positive / total * 100 if total else 0
+    neutral_end = (positive + neutral) / total * 100 if total else 0
+    legend = [
+        ("긍정", positive, "#2563eb"),
+        ("중립", neutral, "#f59e0b"),
+        ("부정", negative, "#ef4444"),
+    ]
+    legend_markup = "\n".join(
+        f"""
+<div class="legend-row">
+    <span class="dot" style="background:{color}"></span>
+    <span class="legend-label">{escape(label)}</span>
+    <span class="legend-value">{value}명 · {pct(value, total)}</span>
+</div>
+"""
+        for label, value, color in legend
+    )
+    return f"""
+{chart_theme()}
+<section class="chart-card">
+    <div class="intent-layout">
+        <div class="donut" data-total="{positive}명 긍정" style="--positive:{positive_end}%; --neutral:{neutral_end}%;"></div>
+        <div class="legend">{legend_markup}</div>
+    </div>
+</section>
+"""
+
+
 def render_header(survey: dict[str, object], total: int) -> None:
     with st.container(border=True):
         st.caption("JEJU EXCHANGE SURVEY")
@@ -170,13 +471,6 @@ def render_header(survey: dict[str, object], total: int) -> None:
             st.warning("Google Sheets 연결 전까지 저장된 CSV 기준 결과를 표시합니다.")
 
 
-def render_metric(label: str, value: str, note: str) -> None:
-    with st.container(border=True):
-        st.caption(label)
-        st.markdown(f"## {value}")
-        st.caption(note)
-
-
 def render_summary(data: dict[str, object], total: int) -> None:
     pain = data["pain"]
     openchat_find = data["openchat_find"]
@@ -186,10 +480,7 @@ def render_summary(data: dict[str, object], total: int) -> None:
     top_openchat = openchat_find[0] if openchat_find else ("-", 0)
 
     st.markdown("## 핵심 요약")
-    render_metric("전체 응답", f"{total}명", "집계된 설문 응답 수")
-    render_metric("4주 이상 체류", f"{data['stay_4weeks']}명", pct(int(data["stay_4weeks"]), total))
-    render_metric("불편 1순위", str(top_pain[0]), f"{top_pain[1]}명")
-    render_metric("오픈채팅 1순위", str(top_openchat[0]), f"{top_openchat[1]}명")
+    render_html(summary_cards_html(data, total), 290)
 
     with st.container(border=True):
         st.markdown("### 지금 가장 먼저 볼 점")
@@ -204,31 +495,14 @@ def render_summary(data: dict[str, object], total: int) -> None:
 
 def render_rank_section(title: str, subtitle: str, items: list[tuple[str, int]], total: int) -> None:
     st.markdown(f"## {title}")
-    with st.container(border=True):
-        st.caption(subtitle)
-        if not items:
-            st.info("아직 표시할 응답이 없습니다.")
-            return
-
-        max_value = max(value for _, value in items) or 1
-        for label, value in items:
-            st.markdown(f"**{label}**")
-            st.progress(value / max_value)
-            st.caption(f"{value}명 · {pct(value, total)}")
+    st.caption(subtitle)
+    height = 124 + max(1, len(items)) * 72
+    render_html(bar_chart_html(items, total), height)
 
 
 def render_intent_section(intent: list[tuple[str, int]], total: int) -> None:
     st.markdown("## 서비스 사용 의향")
-    positive = get_count(intent, "긍정")
-    with st.container(border=True):
-        for label, value in intent:
-            st.markdown(f"**{label}**")
-            st.progress(value / total if total else 0)
-            st.caption(f"{value}명 · {pct(value, total)}")
-
-        st.divider()
-        st.markdown(f"**긍정 응답 {pct(positive, total)}**")
-        st.progress(positive / total if total else 0)
+    render_html(intent_chart_html(intent, total), 340)
 
 
 def render_download_button(path: Path, label: str, file_name: str, mime: str) -> None:
