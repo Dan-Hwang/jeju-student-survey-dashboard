@@ -500,15 +500,21 @@ def render_summary(data: dict[str, object], total: int) -> None:
     positive = get_count(intent, "긍정")
     top_pain = pain[0] if pain else ("-", 0)
     top_openchat = openchat_find[0] if openchat_find else ("-", 0)
+    cards = [
+        ("한국인 응답", f"{total}명", "집계 기준"),
+        ("4주 이상 체류", f"{int(data['stay_4weeks'])}명", pct(int(data["stay_4weeks"]), total)),
+        ("불편 1순위", str(top_pain[0]), f"{top_pain[1]}명"),
+        ("오픈채팅 1순위", str(top_openchat[0]), f"{top_openchat[1]}명"),
+    ]
 
-    st.markdown("## 핵심 요약")
-    render_html(summary_cards_html(data, total), 290)
+    st.markdown("## 한국인 설문 요약")
+    render_html(simple_cards_html(cards), 290)
 
     with st.container(border=True):
-        st.markdown("### 지금 가장 먼저 볼 점")
+        st.markdown("### 먼저 볼 점")
         if total:
             st.write(
-                f"현재 응답에서는 **{top_openchat[0]} 탐색**과 **{top_pain[0]} 문제**가 가장 두드러집니다. "
+                f"한국인 응답에서는 **{top_openchat[0]} 탐색**과 **{top_pain[0]} 문제**가 가장 두드러집니다. "
                 f"서비스 사용 의향은 긍정 {positive}명({pct(positive, total)})으로, 이동/동행 모집 기능을 먼저 검증할 근거가 됩니다."
             )
         else:
@@ -524,7 +530,7 @@ def render_foreign_summary(data: dict[str, object], total: int) -> None:
     top_openchat = openchat_find[0] if openchat_find else ("-", 0)
     top_taxi = data["taxi_frequency"][0] if data["taxi_frequency"] else ("-", 0)
     cards = [
-        ("외국인 응답", f"{total}명", "CSV 집계 기준"),
+        ("외국인 응답", f"{total}명", "집계 기준"),
         ("불편 1순위", str(top_pain[0]), f"{top_pain[1]}명"),
         ("오픈채팅 1순위", str(top_openchat[0]), f"{top_openchat[1]}명"),
         ("택시 이용", str(top_taxi[0]), f"{top_taxi[1]}명"),
@@ -534,7 +540,7 @@ def render_foreign_summary(data: dict[str, object], total: int) -> None:
     render_html(simple_cards_html(cards), 290)
 
     with st.container(border=True):
-        st.markdown("### 외국인 설문에서 먼저 볼 점")
+        st.markdown("### 먼저 볼 점")
         if total:
             st.write(
                 f"외국인 응답에서는 **{top_pain[0]}**와 **{top_openchat[0]}** 수요가 두드러집니다. "
@@ -586,7 +592,7 @@ def render_korean_view(survey: dict[str, object]) -> None:
     render_summary(data, total)
     render_rank_section("제주에서 불편했던 점", "한국인 설문 · 복수 응답", data["pain"], total)
     render_rank_section("같이 하고 싶은 활동", "한국인 설문 · 복수 응답", data["activity"], total)
-    render_rank_section("오픈채팅에서 많이 찾는 것", "한국인 설문 · 단일 응답", data["openchat_find"], total)
+    render_rank_section("오픈채팅에서 찾는 정보", "한국인 설문 · 단일 응답", data["openchat_find"], total)
     render_rank_section("오픈채팅에서 불편한 점", "한국인 설문 · 복수 응답", data["openchat_pain"], total)
     render_intent_section(data["intent"], total)
 
@@ -595,7 +601,7 @@ def render_foreign_view(survey: dict[str, object]) -> None:
     data = survey["data"]
     total = int(data["n"])
     render_foreign_summary(data, total)
-    render_rank_section("불편했던 점", "외국인 설문 · 복수 응답", data["pain"], total)
+    render_rank_section("제주에서 불편했던 점", "외국인 설문 · 복수 응답", data["pain"], total)
     render_rank_section("택시 이용 빈도", "외국인 설문 · 단일 응답", data["taxi_frequency"], total)
     render_rank_section("같이 하고 싶은 활동", "외국인 설문 · 복수 응답", data["activity"], total)
     render_rank_section("오픈채팅에서 찾는 정보", "외국인 설문 · 복수 응답", data["openchat_find"], total)
