@@ -16,6 +16,8 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_SPREADSHEET = "https://docs.google.com/spreadsheets/d/136GDfjr_qUIxsWfWqGOr8CZ392IAcAgVOyCH2eBXQdE/edit"
 DEFAULT_CREDENTIALS = BASE_DIR / "secrets" / "google-service-account.json"
 DEFAULT_CSV = BASE_DIR / "data" / "responses" / "제주대학교 교류학생 생활 플랫폼 설문조사.csv"
+DEFAULT_FOREIGN_CSV = BASE_DIR / "data" / "responses" / "foreign_student_survey.csv"
+DEFAULT_FOREIGN_SUMMARY = BASE_DIR / "data" / "responses" / "foreign_student_survey_summary.json"
 REPORT_PDF = BASE_DIR / "output" / "reports" / "student-survey-live-report.pdf"
 REPORT_PNG = BASE_DIR / "output" / "reports" / "student-survey-live-report.png"
 
@@ -25,6 +27,7 @@ QUESTION_ALIASES = {
     "activity": ["같이 하고 싶은 활동", "activities"],
     "openchat_find": ["오픈채팅에서 가장 많이 찾는", "usually look for in Kakao"],
     "openchat_pain": ["가장 불편한 점", "frustrating", "most frustrating"],
+    "taxi_frequency": ["택시팟을 얼마나 자주", "How often did you use taxis"],
     "intent": ["사용하시겠습니까", "how likely", "use it"],
 }
 
@@ -34,23 +37,35 @@ OPTION_ALIASES = {
     "정보 부족": ["정보 부족", "Lack of information"],
     "교통": ["교통", "Transportation"],
     "같이 이동할 사람 찾기": ["같이 이동할 사람 찾기", "Finding people to travel with"],
+    "여행 계획": ["여행 일정", "Planning trips"],
     "맛집": ["맛집", "Food tours / Restaurants", "Finding places to eat", "Restaurant recommendations"],
     "해수욕": ["해수욕", "Beach trips"],
     "여행": ["여행", "Traveling"],
     "드라이브": ["드라이브", "Road trips"],
-    "카페": ["카페", "Cafes"],
+    "카페": ["카페", "Cafes", "Cafés"],
+    "술/나이트라이프": ["술", "Drinking / Nightlife"],
     "운동": ["운동", "Sports"],
+    "공연": ["공연", "Concerts"],
+    "전시": ["전시회", "전시", "Exhibitions"],
     "공부": ["공부", "Studying together"],
     "택시팟": ["택시팟", "Taxi-sharing"],
     "친구 만들기": ["친구 만들기", "Making friends"],
     "여행팟": ["여행팟", "Travel groups"],
     "공지": ["공지", "Announcements"],
+    "시험정보": ["시험정보", "Exam information"],
     "생활정보": ["생활정보", "Student life information"],
     "원하는 글 찾기 어렵다": ["원하는 글을 찾기 어렵다", "원하는 글 찾기 어렵다", "It's hard to find the information I need"],
     "글이 너무 많다": ["글이 너무 많다", "Too many posts"],
     "지난 글 찾기 어렵다": ["지난 글 찾기 어렵다", "Old posts are difficult to find"],
     "채팅이 빨리 올라간다": ["채팅이 너무 빨리 올라간다", "New messages appear too quickly"],
+    "모집 종료 글 노출": ["모집이 끝난 글이 계속 있다", "Expired recruitment posts are still visible"],
+    "검색 기능 불편": ["검색이 안된다", "The search function is not useful"],
     "정보 정확성 모르겠다": ["정보가 정확한지 모르겠다", "정보가 정확한지 모르겠다", "The search function is not useful"],
+    "거의 매일": ["거의 매일", "Almost every day"],
+    "주 3~4회": ["주 3~4회", "3-4 times a week", "3–4 times a week"],
+    "주 1~2회": ["주 1~2회", "1-2 times a week", "1–2 times a week"],
+    "거의 안함": ["거의 안함", "Rarely"],
+    "이용 안함": ["이용 안함", "Never"],
 }
 
 INTENT_GROUPS = {
@@ -126,6 +141,10 @@ def find_column(headers: list[str], key: str) -> str | None:
 def load_csv(path: Path) -> list[dict[str, str]]:
     with path.open("r", encoding="utf-8-sig", newline="") as f:
         return list(csv.DictReader(f))
+
+
+def load_json(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def quote_sheet_range(title: str) -> str:
@@ -229,6 +248,41 @@ def build_report_data(rows: list[dict[str, str]]) -> dict[str, Any]:
     }
 
 
+def build_foreign_report_data(rows: list[dict[str, str]]) -> dict[str, Any]:
+    headers = list(rows[0].keys()) if rows else []
+    columns = {key: find_column(headers, key) for key in QUESTION_ALIASES}
+    intent = intent_summary(count_single(rows, columns["intent"]))
+    return {
+        "n": len(rows),
+        "pain": top_items(
+            count_multi(rows, columns["pain"]),
+            ["교통", "버스 노선", "택시비", "같이 이동할 사람 찾기", "여행 계획", "정보 부족"],
+            6,
+        ),
+        "taxi_frequency": top_items(
+            count_single(rows, columns["taxi_frequency"]),
+            ["거의 매일", "주 3~4회", "주 1~2회", "거의 안함", "이용 안함"],
+            5,
+        ),
+        "activity": top_items(
+            count_multi(rows, columns["activity"]),
+            ["해수욕", "맛집", "카페", "드라이브", "술/나이트라이프", "운동", "공연", "전시", "여행", "공부"],
+            10,
+        ),
+        "openchat_find": top_items(
+            count_multi(rows, columns["openchat_find"]),
+            ["택시팟", "여행팟", "맛집", "공지", "시험정보", "생활정보", "친구 만들기"],
+            7,
+        ),
+        "openchat_pain": top_items(
+            count_multi(rows, columns["openchat_pain"]),
+            ["글이 너무 많다", "원하는 글 찾기 어렵다", "검색 기능 불편", "지난 글 찾기 어렵다", "채팅이 빨리 올라간다", "모집 종료 글 노출"],
+            6,
+        ),
+        "intent": [("긍정", intent["긍정"]), ("중립", intent["중립"]), ("부정", intent["부정"])],
+    }
+
+
 @st.cache_data(ttl=300, show_spinner=False)
 def get_public_survey() -> dict[str, Any]:
     spreadsheet = get_secret_value("ARA_SURVEY_SPREADSHEET", os.getenv("ARA_SURVEY_SPREADSHEET", DEFAULT_SPREADSHEET))
@@ -258,6 +312,38 @@ def get_public_survey() -> dict[str, Any]:
     return {
         "data": data,
         "rows": len(rows),
+        "source": source,
+        "error": error,
+        "loaded_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+    }
+
+
+@st.cache_data(ttl=300, show_spinner=False)
+def get_foreign_survey() -> dict[str, Any]:
+    rows = load_csv(DEFAULT_FOREIGN_CSV) if DEFAULT_FOREIGN_CSV.exists() else []
+    if rows:
+        data = build_foreign_report_data(rows)
+        source = "CSV"
+        error = ""
+    elif DEFAULT_FOREIGN_SUMMARY.exists():
+        data = load_json(DEFAULT_FOREIGN_SUMMARY)
+        source = "CSV summary"
+        error = ""
+    else:
+        data = {
+        "n": 0,
+        "pain": [],
+        "taxi_frequency": [],
+        "activity": [],
+        "openchat_find": [],
+        "openchat_pain": [],
+        "intent": [("긍정", 0), ("중립", 0), ("부정", 0)],
+        }
+        source = "empty"
+        error = "외국인 설문 집계 파일을 찾을 수 없습니다."
+    return {
+        "data": data,
+        "rows": int(data["n"]),
         "source": source,
         "error": error,
         "loaded_at": datetime.now().strftime("%Y-%m-%d %H:%M"),

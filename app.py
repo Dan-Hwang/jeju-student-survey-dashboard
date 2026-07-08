@@ -7,7 +7,7 @@ from typing import Any
 import streamlit as st
 import streamlit.components.v1 as components
 
-from src.survey_dashboard import REPORT_PDF, REPORT_PNG, get_public_survey, pct
+from src.survey_dashboard import REPORT_PDF, REPORT_PNG, get_foreign_survey, get_public_survey, pct
 
 
 def apply_page_style() -> None:
@@ -151,6 +151,10 @@ def source_label(source: str) -> str:
         return "Google Sheets"
     if source == "CSV fallback":
         return "저장 CSV"
+    if source == "CSV":
+        return "CSV"
+    if source == "CSV summary":
+        return "집계 CSV"
     return "데이터 없음"
 
 
@@ -402,6 +406,20 @@ def summary_cards_html(data: dict[str, Any], total: int) -> str:
     return f"{chart_theme()}<section class='summary-grid'>{card_markup}</section>"
 
 
+def simple_cards_html(cards: list[tuple[str, str, str]]) -> str:
+    card_markup = "\n".join(
+        f"""
+<article class="summary-card">
+    <div class="summary-label">{escape(label)}</div>
+    <div class="summary-value">{escape(value)}</div>
+    <div class="summary-note">{escape(note)}</div>
+</article>
+"""
+        for label, value, note in cards
+    )
+    return f"{chart_theme()}<section class='summary-grid'>{card_markup}</section>"
+
+
 def bar_chart_html(items: list[tuple[str, int]], total: int) -> str:
     if not items:
         return f"{chart_theme()}<section class='chart-card'>아직 표시할 응답이 없습니다.</section>"
@@ -455,20 +473,24 @@ def intent_chart_html(intent: list[tuple[str, int]], total: int) -> str:
 """
 
 
-def render_header(survey: dict[str, object], total: int) -> None:
+def render_header(korean_survey: dict[str, object], foreign_survey: dict[str, object]) -> None:
+    korean_total = int(korean_survey["data"]["n"])
+    foreign_total = int(foreign_survey["data"]["n"])
     with st.container(border=True):
         st.caption("JEJU EXCHANGE SURVEY")
         st.title("교류학생 생활 플랫폼 수요조사")
         st.write(
-            "교류학생의 이동, 동행 모집, 오픈채팅 이용 불편을 한눈에 확인하기 위한 공개 요약 페이지입니다."
+            "한국어 설문과 외국인 학생 설문을 함께 보며, 이동/동행 모집/오픈채팅 이용 불편을 비교합니다."
         )
         st.caption(
-            f"응답 {total}명 · 마지막 갱신 {survey['loaded_at']} · 데이터 소스 {source_label(str(survey['source']))}"
+            f"한국어 {korean_total}명 · 외국인 {foreign_total}명 · 마지막 갱신 {korean_survey['loaded_at']}"
         )
-        if survey.get("error"):
-            st.warning(f"{survey['error']}로 인해 저장된 CSV 기준 결과를 표시합니다.")
-        elif survey.get("source") != "Google Sheets":
+        if korean_survey.get("error"):
+            st.warning(f"{korean_survey['error']}로 인해 한국어 설문은 저장된 CSV 기준 결과를 표시합니다.")
+        elif korean_survey.get("source") != "Google Sheets":
             st.warning("Google Sheets 연결 전까지 저장된 CSV 기준 결과를 표시합니다.")
+        if foreign_survey.get("error"):
+            st.warning(str(foreign_survey["error"]))
 
 
 def render_summary(data: dict[str, object], total: int) -> None:
@@ -488,6 +510,35 @@ def render_summary(data: dict[str, object], total: int) -> None:
             st.write(
                 f"현재 응답에서는 **{top_openchat[0]} 탐색**과 **{top_pain[0]} 문제**가 가장 두드러집니다. "
                 f"서비스 사용 의향은 긍정 {positive}명({pct(positive, total)})으로, 이동/동행 모집 기능을 먼저 검증할 근거가 됩니다."
+            )
+        else:
+            st.write("아직 표시할 응답이 없습니다.")
+
+
+def render_foreign_summary(data: dict[str, object], total: int) -> None:
+    pain = data["pain"]
+    openchat_find = data["openchat_find"]
+    intent = data["intent"]
+    positive = get_count(intent, "긍정")
+    top_pain = pain[0] if pain else ("-", 0)
+    top_openchat = openchat_find[0] if openchat_find else ("-", 0)
+    top_taxi = data["taxi_frequency"][0] if data["taxi_frequency"] else ("-", 0)
+    cards = [
+        ("외국인 응답", f"{total}명", "CSV 집계 기준"),
+        ("불편 1순위", str(top_pain[0]), f"{top_pain[1]}명"),
+        ("오픈채팅 1순위", str(top_openchat[0]), f"{top_openchat[1]}명"),
+        ("택시 이용", str(top_taxi[0]), f"{top_taxi[1]}명"),
+    ]
+
+    st.markdown("## 외국인 설문 요약")
+    render_html(simple_cards_html(cards), 290)
+
+    with st.container(border=True):
+        st.markdown("### 외국인 설문에서 먼저 볼 점")
+        if total:
+            st.write(
+                f"외국인 응답에서는 **{top_pain[0]}**와 **{top_openchat[0]}** 수요가 두드러집니다. "
+                f"서비스 사용 의향은 긍정 {positive}명({pct(positive, total)})입니다."
             )
         else:
             st.write("아직 표시할 응답이 없습니다.")
@@ -529,6 +580,64 @@ def render_downloads() -> None:
             render_download_button(REPORT_PNG, "PNG 내려받기", "jeju-student-survey-report.png", "image/png")
 
 
+def render_korean_view(survey: dict[str, object]) -> None:
+    data = survey["data"]
+    total = int(data["n"])
+    render_summary(data, total)
+    render_rank_section("제주에서 불편했던 점", "한국어 설문 · 복수 응답", data["pain"], total)
+    render_rank_section("같이 하고 싶은 활동", "한국어 설문 · 복수 응답", data["activity"], total)
+    render_rank_section("오픈채팅에서 많이 찾는 것", "한국어 설문 · 단일 응답", data["openchat_find"], total)
+    render_rank_section("오픈채팅에서 불편한 점", "한국어 설문 · 복수 응답", data["openchat_pain"], total)
+    render_intent_section(data["intent"], total)
+
+
+def render_foreign_view(survey: dict[str, object]) -> None:
+    data = survey["data"]
+    total = int(data["n"])
+    render_foreign_summary(data, total)
+    render_rank_section("불편했던 점", "외국인 설문 · 복수 응답", data["pain"], total)
+    render_rank_section("택시 이용 빈도", "외국인 설문 · 단일 응답", data["taxi_frequency"], total)
+    render_rank_section("같이 하고 싶은 활동", "외국인 설문 · 복수 응답", data["activity"], total)
+    render_rank_section("오픈채팅에서 찾는 정보", "외국인 설문 · 복수 응답", data["openchat_find"], total)
+    render_rank_section("오픈채팅에서 불편한 점", "외국인 설문 · 복수 응답", data["openchat_pain"], total)
+    render_intent_section(data["intent"], total)
+
+
+def render_compare_view(korean_survey: dict[str, object], foreign_survey: dict[str, object]) -> None:
+    korean = korean_survey["data"]
+    foreign = foreign_survey["data"]
+    korean_total = int(korean["n"])
+    foreign_total = int(foreign["n"])
+    korean_top_pain = korean["pain"][0] if korean["pain"] else ("-", 0)
+    foreign_top_pain = foreign["pain"][0] if foreign["pain"] else ("-", 0)
+    korean_top_openchat = korean["openchat_find"][0] if korean["openchat_find"] else ("-", 0)
+    foreign_top_openchat = foreign["openchat_find"][0] if foreign["openchat_find"] else ("-", 0)
+    korean_positive = get_count(korean["intent"], "긍정")
+    foreign_positive = get_count(foreign["intent"], "긍정")
+
+    st.markdown("## 비교 요약")
+    cards = [
+        ("한국어 응답", f"{korean_total}명", f"긍정 {pct(korean_positive, korean_total)}"),
+        ("외국인 응답", f"{foreign_total}명", f"긍정 {pct(foreign_positive, foreign_total)}"),
+        ("한국어 불편", str(korean_top_pain[0]), f"{korean_top_pain[1]}명"),
+        ("외국인 불편", str(foreign_top_pain[0]), f"{foreign_top_pain[1]}명"),
+    ]
+    render_html(simple_cards_html(cards), 290)
+
+    with st.container(border=True):
+        st.markdown("### 공통으로 보이는 방향")
+        st.write(
+            f"한국어 설문은 **{korean_top_openchat[0]}** 중심, 외국인 설문은 **{foreign_top_openchat[0]}** 중심으로 오픈채팅 수요가 나타납니다. "
+            "두 집단 모두 이동과 동행 모집, 그리고 흩어진 정보를 한곳에서 찾는 흐름이 강하므로 "
+            "초기 서비스는 실시간 이동/동행 모집과 신뢰 가능한 정보 정리를 함께 보여주는 방향이 적합합니다."
+        )
+
+    render_rank_section("한국어 설문: 불편했던 점", "비교용", korean["pain"], korean_total)
+    render_rank_section("외국인 설문: 불편했던 점", "비교용", foreign["pain"], foreign_total)
+    render_rank_section("한국어 설문: 오픈채팅에서 찾는 것", "비교용", korean["openchat_find"], korean_total)
+    render_rank_section("외국인 설문: 오픈채팅에서 찾는 정보", "비교용", foreign["openchat_find"], foreign_total)
+
+
 def render_survey_dashboard() -> None:
     st.set_page_config(
         page_title="제주대학교 교류학생 생활 플랫폼 수요조사",
@@ -537,17 +646,28 @@ def render_survey_dashboard() -> None:
     )
     apply_page_style()
 
-    survey = get_public_survey()
-    data = survey["data"]
-    total = int(data["n"])
+    korean_survey = get_public_survey()
+    foreign_survey = get_foreign_survey()
 
-    render_header(survey, total)
-    render_summary(data, total)
-    render_rank_section("제주에서 불편했던 점", "복수 응답", data["pain"], total)
-    render_rank_section("같이 하고 싶은 활동", "복수 응답", data["activity"], total)
-    render_rank_section("오픈채팅에서 많이 찾는 것", "단일 응답", data["openchat_find"], total)
-    render_rank_section("오픈채팅에서 불편한 점", "복수 응답", data["openchat_pain"], total)
-    render_intent_section(data["intent"], total)
+    render_header(korean_survey, foreign_survey)
+    selected_view = st.radio(
+        "보기 선택",
+        ["전체 요약", "한국어 설문", "외국인 설문", "비교 요약"],
+        horizontal=True,
+        label_visibility="collapsed",
+    )
+
+    if selected_view == "한국어 설문":
+        render_korean_view(korean_survey)
+    elif selected_view == "외국인 설문":
+        render_foreign_view(foreign_survey)
+    elif selected_view == "비교 요약":
+        render_compare_view(korean_survey, foreign_survey)
+    else:
+        render_compare_view(korean_survey, foreign_survey)
+        render_korean_view(korean_survey)
+        render_foreign_view(foreign_survey)
+
     render_downloads()
 
 
