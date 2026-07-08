@@ -562,6 +562,20 @@ def render_intent_section(intent: list[tuple[str, int]], total: int) -> None:
     render_html(intent_chart_html(intent, total), 340)
 
 
+def render_comments_section(comments: list[str]) -> None:
+    st.markdown("## 익명 자유 의견")
+    with st.container(border=True):
+        st.caption("빈 답변과 N/A성 답변은 제외했습니다.")
+        if not comments:
+            st.write("아직 표시할 자유 의견이 없습니다.")
+            return
+        for index, comment in enumerate(comments, start=1):
+            st.markdown(f"**의견 {index}**")
+            st.write(comment)
+            if index < len(comments):
+                st.divider()
+
+
 def render_download_button(path: Path, label: str, file_name: str, mime: str) -> None:
     if path.exists():
         st.download_button(
@@ -595,6 +609,7 @@ def render_korean_view(survey: dict[str, object]) -> None:
     render_rank_section("오픈채팅에서 찾는 정보", "한국인 설문 · 단일 응답", data["openchat_find"], total)
     render_rank_section("오픈채팅에서 불편한 점", "한국인 설문 · 복수 응답", data["openchat_pain"], total)
     render_intent_section(data["intent"], total)
+    render_comments_section(data.get("comments", []))
 
 
 def render_foreign_view(survey: dict[str, object]) -> None:
@@ -607,6 +622,7 @@ def render_foreign_view(survey: dict[str, object]) -> None:
     render_rank_section("오픈채팅에서 찾는 정보", "외국인 설문 · 복수 응답", data["openchat_find"], total)
     render_rank_section("오픈채팅에서 불편한 점", "외국인 설문 · 복수 응답", data["openchat_pain"], total)
     render_intent_section(data["intent"], total)
+    render_comments_section(data.get("comments", []))
 
 
 def render_compare_view(korean_survey: dict[str, object], foreign_survey: dict[str, object]) -> None:
@@ -687,6 +703,9 @@ def render_survey_dashboard() -> None:
     foreign_survey = get_foreign_survey()
 
     render_header(korean_survey, foreign_survey)
+    if st.button("데이터 새로고침", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
     selected_view = st.radio(
         "보기 선택",
         ["전체 요약", "한국인 설문", "외국인 설문", "비교 요약"],

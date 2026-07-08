@@ -30,6 +30,7 @@ QUESTION_ALIASES = {
     "openchat_pain": ["가장 불편한 점", "frustrating", "most frustrating"],
     "taxi_frequency": ["택시팟을 얼마나 자주", "How often did you use taxis"],
     "intent": ["사용하시겠습니까", "how likely", "use it"],
+    "comment": ["자유롭게", "anything else", "feedback", "suggestions"],
 }
 
 OPTION_ALIASES = {
@@ -116,6 +117,7 @@ def empty_report_data() -> dict[str, Any]:
         "openchat_pain": [],
         "intent": [("긍정", 0), ("중립", 0), ("부정", 0)],
         "stay_4weeks": 0,
+        "comments": [],
     }
 
 
@@ -221,6 +223,20 @@ def count_single(rows: list[dict[str, str]], column: str | None) -> Counter:
     return counter
 
 
+def collect_comments(rows: list[dict[str, str]], column: str | None) -> list[str]:
+    if not column:
+        return []
+    ignored = {"", "-", "없음", "없습니다", "n/a", "na", "no", "none", "nothing"}
+    comments: list[str] = []
+    for row in rows:
+        value = row.get(column, "").strip()
+        normalized = value.lower().replace(".", "").strip()
+        if normalized in ignored:
+            continue
+        comments.append(value)
+    return comments
+
+
 def intent_summary(counter: Counter) -> Counter:
     summary: Counter = Counter({"긍정": 0, "중립": 0, "부정": 0})
     for value, count in counter.items():
@@ -255,6 +271,7 @@ def build_report_data(rows: list[dict[str, str]]) -> dict[str, Any]:
         "openchat_pain": top_items(count_multi(rows, columns["openchat_pain"]), ["원하는 글 찾기 어렵다", "글이 너무 많다", "지난 글 찾기 어렵다", "채팅이 빨리 올라간다", "정보 정확성 모르겠다"], 5),
         "intent": [("긍정", intent["긍정"]), ("중립", intent["중립"]), ("부정", intent["부정"])],
         "stay_4weeks": stay.get("4주 이상", 0) + stay.get("More than 4 weeks", 0),
+        "comments": collect_comments(rows, columns["comment"]),
     }
 
 
@@ -290,6 +307,7 @@ def build_foreign_report_data(rows: list[dict[str, str]]) -> dict[str, Any]:
             6,
         ),
         "intent": [("긍정", intent["긍정"]), ("중립", intent["중립"]), ("부정", intent["부정"])],
+        "comments": collect_comments(rows, columns["comment"]),
     }
 
 
@@ -361,6 +379,7 @@ def get_foreign_survey() -> dict[str, Any]:
         "openchat_find": [],
         "openchat_pain": [],
         "intent": [("긍정", 0), ("중립", 0), ("부정", 0)],
+        "comments": [],
         }
         if not error:
             error = "외국인 설문 집계 파일을 찾을 수 없습니다."
