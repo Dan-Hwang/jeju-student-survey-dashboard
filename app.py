@@ -562,18 +562,43 @@ def render_intent_section(intent: list[tuple[str, int]], total: int) -> None:
     render_html(intent_chart_html(intent, total), 340)
 
 
-def render_comments_section(comments: list[str]) -> None:
+def render_comments_section(comments: list[str], key_prefix: str) -> None:
     st.markdown("## 익명 자유 의견")
     with st.container(border=True):
         st.caption("빈 답변과 N/A성 답변은 제외했습니다.")
         if not comments:
             st.write("아직 표시할 자유 의견이 없습니다.")
             return
-        for index, comment in enumerate(comments, start=1):
+
+        page_size = 5
+        total_pages = max(1, (len(comments) + page_size - 1) // page_size)
+        page_key = f"{key_prefix}_comments_page"
+        st.session_state[page_key] = min(st.session_state.get(page_key, 0), total_pages - 1)
+
+        current_page = st.session_state[page_key]
+        start = current_page * page_size
+        visible_comments = comments[start : start + page_size]
+
+        st.caption(f"{len(comments)}개 중 {start + 1}-{start + len(visible_comments)}개 표시")
+        for offset, comment in enumerate(visible_comments, start=1):
+            index = start + offset
             st.markdown(f"**의견 {index}**")
             st.write(comment)
-            if index < len(comments):
+            if offset < len(visible_comments):
                 st.divider()
+
+        if total_pages > 1:
+            previous_col, page_col, next_col = st.columns([1, 1, 1])
+            with previous_col:
+                if st.button("이전", key=f"{key_prefix}_comments_prev", disabled=current_page == 0, use_container_width=True):
+                    st.session_state[page_key] = current_page - 1
+                    st.rerun()
+            with page_col:
+                st.markdown(f"<div style='text-align:center; padding-top:0.45rem;'>{current_page + 1} / {total_pages}</div>", unsafe_allow_html=True)
+            with next_col:
+                if st.button("다음", key=f"{key_prefix}_comments_next", disabled=current_page >= total_pages - 1, use_container_width=True):
+                    st.session_state[page_key] = current_page + 1
+                    st.rerun()
 
 
 def render_download_button(path: Path, label: str, file_name: str, mime: str) -> None:
@@ -609,7 +634,7 @@ def render_korean_view(survey: dict[str, object]) -> None:
     render_rank_section("오픈채팅에서 찾는 정보", "한국인 설문 · 단일 응답", data["openchat_find"], total)
     render_rank_section("오픈채팅에서 불편한 점", "한국인 설문 · 복수 응답", data["openchat_pain"], total)
     render_intent_section(data["intent"], total)
-    render_comments_section(data.get("comments", []))
+    render_comments_section(data.get("comments", []), "korean")
 
 
 def render_foreign_view(survey: dict[str, object]) -> None:
@@ -622,7 +647,7 @@ def render_foreign_view(survey: dict[str, object]) -> None:
     render_rank_section("오픈채팅에서 찾는 정보", "외국인 설문 · 복수 응답", data["openchat_find"], total)
     render_rank_section("오픈채팅에서 불편한 점", "외국인 설문 · 복수 응답", data["openchat_pain"], total)
     render_intent_section(data["intent"], total)
-    render_comments_section(data.get("comments", []))
+    render_comments_section(data.get("comments", []), "foreign")
 
 
 def render_compare_view(korean_survey: dict[str, object], foreign_survey: dict[str, object]) -> None:
