@@ -14,6 +14,7 @@ import streamlit as st
 
 BASE_DIR = Path(__file__).resolve().parents[1]
 DEFAULT_SPREADSHEET = "https://docs.google.com/spreadsheets/d/136GDfjr_qUIxsWfWqGOr8CZ392IAcAgVOyCH2eBXQdE/edit"
+DEFAULT_FOREIGN_SPREADSHEET = ""
 DEFAULT_CREDENTIALS = BASE_DIR / "secrets" / "google-service-account.json"
 DEFAULT_CSV = BASE_DIR / "data" / "responses" / "제주대학교 교류학생 생활 플랫폼 설문조사.csv"
 DEFAULT_FOREIGN_CSV = BASE_DIR / "data" / "responses" / "foreign_student_survey.csv"
@@ -95,6 +96,15 @@ def load_credentials_from_secrets() -> Path | None:
         return None
     target.write_text(json.dumps(data), encoding="utf-8")
     return target
+
+
+def get_credentials_path() -> Path:
+    credentials_path = Path(os.getenv("GOOGLE_APPLICATION_CREDENTIALS", str(DEFAULT_CREDENTIALS)))
+    if not credentials_path.exists():
+        credentials_from_secrets = load_credentials_from_secrets()
+        if credentials_from_secrets:
+            credentials_path = credentials_from_secrets
+    return credentials_path
 
 
 def empty_report_data() -> dict[str, Any]:
@@ -286,11 +296,7 @@ def build_foreign_report_data(rows: list[dict[str, str]]) -> dict[str, Any]:
 @st.cache_data(ttl=300, show_spinner=False)
 def get_public_survey() -> dict[str, Any]:
     spreadsheet = get_secret_value("ARA_SURVEY_SPREADSHEET", os.getenv("ARA_SURVEY_SPREADSHEET", DEFAULT_SPREADSHEET))
-    credentials_path = Path(os.getenv("GOOGLE_APPLICATION_CREDENTIALS", str(DEFAULT_CREDENTIALS)))
-    if not credentials_path.exists():
-        credentials_from_secrets = load_credentials_from_secrets()
-        if credentials_from_secrets:
-            credentials_path = credentials_from_secrets
+    credentials_path = get_credentials_path()
 
     source = "Google Sheets"
     error = ""
@@ -320,15 +326,32 @@ def get_public_survey() -> dict[str, Any]:
 
 @st.cache_data(ttl=300, show_spinner=False)
 def get_foreign_survey() -> dict[str, Any]:
-    rows = load_csv(DEFAULT_FOREIGN_CSV) if DEFAULT_FOREIGN_CSV.exists() else []
+    spreadsheet = get_secret_value(
+        "ARA_FOREIGN_SURVEY_SPREADSHEET",
+        os.getenv("ARA_FOREIGN_SURVEY_SPREADSHEET", DEFAULT_FOREIGN_SPREADSHEET),
+    )
+    credentials_path = get_credentials_path()
+
+    source = "empty"
+    error = ""
+    rows: list[dict[str, str]] = []
+    if spreadsheet and credentials_path.exists():
+        try:
+            rows = load_sheets(normalize_spreadsheet_id(spreadsheet), credentials_path)
+            source = "Google Sheets"
+        except Exception as exc:
+            error = f"외국인 설문 Google Sheets 연결 실패: {type(exc).__name__}"
+            rows = []
+
     if rows:
         data = build_foreign_report_data(rows)
+    elif DEFAULT_FOREIGN_CSV.exists():
+        rows = load_csv(DEFAULT_FOREIGN_CSV)
+        data = build_foreign_report_data(rows)
         source = "CSV"
-        error = ""
     elif DEFAULT_FOREIGN_SUMMARY.exists():
         data = load_json(DEFAULT_FOREIGN_SUMMARY)
         source = "CSV summary"
-        error = ""
     else:
         data = {
         "n": 0,
@@ -339,8 +362,8 @@ def get_foreign_survey() -> dict[str, Any]:
         "openchat_pain": [],
         "intent": [("긍정", 0), ("중립", 0), ("부정", 0)],
         }
-        source = "empty"
-        error = "외국인 설문 집계 파일을 찾을 수 없습니다."
+        if not error:
+            error = "외국인 설문 집계 파일을 찾을 수 없습니다."
     return {
         "data": data,
         "rows": int(data["n"]),
