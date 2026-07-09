@@ -1,13 +1,21 @@
 from __future__ import annotations
 
+from datetime import datetime
 from html import escape
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
 import streamlit as st
 import streamlit.components.v1 as components
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen import canvas
 
-from src.survey_dashboard import REPORT_PDF, REPORT_PNG, get_foreign_survey, get_public_survey, pct
+from src.survey_dashboard import get_foreign_survey, get_public_survey, pct
 
 
 def apply_page_style() -> None:
@@ -601,28 +609,250 @@ def render_comments_section(comments: list[str], key_prefix: str) -> None:
                     st.rerun()
 
 
-def render_download_button(path: Path, label: str, file_name: str, mime: str) -> None:
-    if path.exists():
-        st.download_button(
-            label,
-            data=path.read_bytes(),
-            file_name=file_name,
-            mime=mime,
-            use_container_width=True,
-        )
-    else:
-        st.button(f"{label} 준비 중", disabled=True, use_container_width=True)
+PDF_FONT = "HYGothic-Medium"
+PDF_TTF_FONT = "AraKorean"
+PDF_FONT_CANDIDATES = [
+    Path("assets/fonts/NotoSansKR-Regular.ttf"),
+    Path("C:/Windows/Fonts/NotoSansKR-VF.ttf"),
+    Path("C:/Windows/Fonts/malgun.ttf"),
+    Path("/usr/share/fonts/truetype/nanum/NanumGothic.ttf"),
+    Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
+]
+PDF_TEXT = colors.HexColor("#172033")
+PDF_MUTED = colors.HexColor("#64748B")
+PDF_LINE = colors.HexColor("#D8E2EE")
+PDF_BLUE = colors.HexColor("#2563EB")
+PDF_TEAL = colors.HexColor("#0F766E")
 
 
-def render_downloads() -> None:
+def register_pdf_font() -> str:
+    if PDF_TTF_FONT in pdfmetrics.getRegisteredFontNames():
+        return PDF_TTF_FONT
+
+    for font_path in PDF_FONT_CANDIDATES:
+        if font_path.exists():
+            try:
+                pdfmetrics.registerFont(TTFont(PDF_TTF_FONT, str(font_path)))
+                return PDF_TTF_FONT
+            except Exception:
+                continue
+
+    if PDF_FONT not in pdfmetrics.getRegisteredFontNames():
+        pdfmetrics.registerFont(UnicodeCIDFont(PDF_FONT))
+    return PDF_FONT
+
+
+def draw_wrapped_text(
+    c: canvas.Canvas,
+    text: str,
+    x: float,
+    y: float,
+    max_width: float,
+    line_height: float,
+    font_name: str,
+    font_size: int,
+    color: colors.Color = PDF_TEXT,
+) -> float:
+    c.setFont(font_name, font_size)
+    c.setFillColor(color)
+    for paragraph in str(text).splitlines() or [""]:
+        current = ""
+        for char in paragraph:
+            candidate = current + char
+            if current and pdfmetrics.stringWidth(candidate, font_name, font_size) > max_width:
+                c.drawString(x, y, current)
+                y -= line_height
+                current = char
+            else:
+                current = candidate
+        if current:
+            c.drawString(x, y, current)
+            y -= line_height
+    return y
+
+
+def draw_pdf_title(c: canvas.Canvas, title: str, subtitle: str, y: float, font_name: str) -> float:
+    c.setFillColor(PDF_TEAL)
+    c.setFont(font_name, 9)
+    c.drawString(42, y, "JEJU NATIONAL UNIVERSITY EXCHANGE STUDENT SURVEY")
+    y -= 28
+    y = draw_wrapped_text(c, title, 42, y, 510, 25, font_name, 22)
+    y -= 8
+    return draw_wrapped_text(c, subtitle, 42, y, 510, 15, font_name, 10, PDF_MUTED) - 18
+
+
+def draw_pdf_section(c: canvas.Canvas, title: str, y: float, font_name: str) -> float:
+    c.setStrokeColor(PDF_LINE)
+    c.line(42, y + 12, 553, y + 12)
+    c.setFillColor(PDF_TEXT)
+    c.setFont(font_name, 16)
+    c.drawString(42, y - 8, title)
+    return y - 34
+
+
+def draw_pdf_metric(c: canvas.Canvas, label: str, value: str, note: str, x: float, y: float, font_name: str) -> None:
+    c.setStrokeColor(PDF_LINE)
+    c.setFillColor(colors.white)
+    c.roundRect(x, y - 70, 118, 70, 10, stroke=1, fill=1)
+    c.setFillColor(PDF_MUTED)
+    c.setFont(font_name, 9)
+    c.drawString(x + 12, y - 19, label)
+    c.setFillColor(PDF_TEXT)
+    c.setFont(font_name, 19)
+    c.drawString(x + 12, y - 43, value)
+    c.setFillColor(PDF_TEAL)
+    c.setFont(font_name, 8)
+    c.drawString(x + 12, y - 59, note)
+
+
+def draw_pdf_rankings(
+    c: canvas.Canvas,
+    title: str,
+    items: list[tuple[str, int]],
+    total: int,
+    x: float,
+    y: float,
+    font_name: str,
+    limit: int = 5,
+) -> float:
+    c.setFillColor(PDF_TEXT)
+    c.setFont(font_name, 12)
+    c.drawString(x, y, title)
+    y -= 19
+    max_value = max([value for _, value in items[:limit]] + [1])
+    for label, value in items[:limit]:
+        ratio = value / max_value if max_value else 0
+        c.setFillColor(PDF_TEXT)
+        c.setFont(font_name, 9)
+        c.drawString(x, y, str(label)[:22])
+        c.setFillColor(colors.HexColor("#E8EEF5"))
+        c.roundRect(x + 118, y - 1, 92, 6, 3, stroke=0, fill=1)
+        c.setFillColor(PDF_TEAL)
+        c.roundRect(x + 118, y - 1, 92 * ratio, 6, 3, stroke=0, fill=1)
+        c.setFillColor(PDF_MUTED)
+        c.drawRightString(x + 250, y, f"{value}명 · {pct(value, total)}")
+        y -= 18
+    return y - 10
+
+
+def draw_pdf_comments(c: canvas.Canvas, comments: list[str], x: float, y: float, font_name: str, limit: int = 5) -> float:
+    c.setFillColor(PDF_TEXT)
+    c.setFont(font_name, 12)
+    c.drawString(x, y, "익명 자유 의견")
+    y -= 18
+    if not comments:
+        c.setFillColor(PDF_MUTED)
+        c.setFont(font_name, 9)
+        c.drawString(x, y, "표시할 자유 의견이 없습니다.")
+        return y - 18
+    for index, comment in enumerate(comments[:limit], start=1):
+        y = draw_wrapped_text(c, f"{index}. {comment}", x, y, 495, 13, font_name, 8, PDF_TEXT)
+        y -= 4
+    if len(comments) > limit:
+        c.setFillColor(PDF_MUTED)
+        c.setFont(font_name, 8)
+        c.drawString(x, y, f"외 {len(comments) - limit}개 의견은 사이트의 익명 자유 의견 페이지에서 확인할 수 있습니다.")
+        y -= 14
+    return y
+
+
+def draw_survey_pdf_page(c: canvas.Canvas, title: str, data: dict[str, Any], source: str, loaded_at: str, font_name: str) -> None:
+    total = int(data["n"])
+    top_pain = data["pain"][0] if data["pain"] else ("-", 0)
+    top_openchat = data["openchat_find"][0] if data["openchat_find"] else ("-", 0)
+    positive = get_count(data["intent"], "긍정")
+
+    y = draw_pdf_title(c, title, f"응답 {total}명 · 데이터 소스 {source_label(source)} · 마지막 갱신 {loaded_at}", 800, font_name)
+    draw_pdf_metric(c, "응답 수", f"{total}명", "현재 집계 기준", 42, y, font_name)
+    draw_pdf_metric(c, "불편 1순위", str(top_pain[0]), f"{top_pain[1]}명", 172, y, font_name)
+    draw_pdf_metric(c, "오픈채팅 1순위", str(top_openchat[0]), f"{top_openchat[1]}명", 302, y, font_name)
+    draw_pdf_metric(c, "사용 의향", f"{positive}명", f"긍정 {pct(positive, total)}", 432, y, font_name)
+
+    y -= 100
+    y = draw_pdf_section(c, "주요 응답", y, font_name)
+    left_y = draw_pdf_rankings(c, "제주에서 불편했던 점", data["pain"], total, 42, y, font_name)
+    right_y = draw_pdf_rankings(c, "오픈채팅에서 찾는 정보", data["openchat_find"], total, 315, y, font_name)
+    y = min(left_y, right_y) - 4
+    left_y = draw_pdf_rankings(c, "같이 하고 싶은 활동", data["activity"], total, 42, y, font_name)
+    right_y = draw_pdf_rankings(c, "오픈채팅에서 불편한 점", data["openchat_pain"], total, 315, y, font_name)
+    y = min(left_y, right_y) - 4
+    y = draw_pdf_section(c, "익명 의견", y, font_name)
+    draw_pdf_comments(c, data.get("comments", []), 42, y, font_name)
+
+
+def build_current_pdf(korean_survey: dict[str, Any], foreign_survey: dict[str, Any]) -> bytes:
+    font_name = register_pdf_font()
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+
+    korean = korean_survey["data"]
+    foreign = foreign_survey["data"]
+    generated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    korean_total = int(korean["n"])
+    foreign_total = int(foreign["n"])
+    korean_top = korean["openchat_find"][0] if korean["openchat_find"] else ("-", 0)
+    foreign_top = foreign["openchat_find"][0] if foreign["openchat_find"] else ("-", 0)
+
+    y = draw_pdf_title(c, "제주대학교 교류학생 생활 플랫폼 수요조사", f"생성 시각 {generated_at} · 한국인/외국인 설문 집계 요약", 800, font_name)
+    draw_pdf_metric(c, "전체 응답", f"{korean_total + foreign_total}명", "한국인 + 외국인", 42, y, font_name)
+    draw_pdf_metric(c, "한국인 응답", f"{korean_total}명", f"주요 수요 {korean_top[0]}", 172, y, font_name)
+    draw_pdf_metric(c, "외국인 응답", f"{foreign_total}명", f"주요 수요 {foreign_top[0]}", 302, y, font_name)
+    draw_pdf_metric(c, "공통 방향", "이동/동행", "모집과 정보 탐색", 432, y, font_name)
+    y -= 105
+    y = draw_pdf_section(c, "데이터 기준", y, font_name)
+    y = draw_wrapped_text(c, f"한국인 설문: {source_label(str(korean_survey.get('source', '')))} · {korean_survey.get('loaded_at', '-')}", 42, y, 500, 15, font_name, 10)
+    y = draw_wrapped_text(c, f"외국인 설문: {source_label(str(foreign_survey.get('source', '')))} · {foreign_survey.get('loaded_at', '-')}", 42, y, 500, 15, font_name, 10)
+    y -= 14
+    y = draw_pdf_section(c, "한눈에 보는 결론", y, font_name)
+    draw_wrapped_text(
+        c,
+        f"한국인 설문은 {korean_top[0]}, 외국인 설문은 {foreign_top[0]} 수요가 두드러집니다. "
+        "PDF는 다운로드 시점의 앱 집계 데이터를 기준으로 생성되며, 개인 식별 정보와 원본 응답 행은 포함하지 않습니다.",
+        42,
+        y,
+        500,
+        16,
+        font_name,
+        10,
+    )
+    c.showPage()
+
+    draw_survey_pdf_page(
+        c,
+        "한국인 설문 요약",
+        korean,
+        str(korean_survey.get("source", "")),
+        str(korean_survey.get("loaded_at", "-")),
+        font_name,
+    )
+    c.showPage()
+
+    draw_survey_pdf_page(
+        c,
+        "외국인 설문 요약",
+        foreign,
+        str(foreign_survey.get("source", "")),
+        str(foreign_survey.get("loaded_at", "-")),
+        font_name,
+    )
+    c.showPage()
+
+    c.save()
+    return buffer.getvalue()
+
+
+def render_downloads(korean_survey: dict[str, Any], foreign_survey: dict[str, Any]) -> None:
     st.markdown("## 공유 자료")
     with st.container(border=True):
-        st.write("개별 응답과 원본 대화는 공개하지 않고, 집계 결과만 표시합니다.")
-        col_pdf, col_png = st.columns(2)
-        with col_pdf:
-            render_download_button(REPORT_PDF, "PDF 내려받기", "jeju-student-survey-report.pdf", "application/pdf")
-        with col_png:
-            render_download_button(REPORT_PNG, "PNG 내려받기", "jeju-student-survey-report.png", "image/png")
+        st.write("개별 응답과 원본 대화는 공개하지 않고, 현재 집계 결과와 익명 자유 의견 일부만 표시합니다.")
+        st.download_button(
+            "현재 데이터로 PDF 내려받기",
+            data=build_current_pdf(korean_survey, foreign_survey),
+            file_name="jeju-student-survey-live-report.pdf",
+            mime="application/pdf",
+            use_container_width=True,
+        )
+        st.caption("PDF는 다운로드 버튼을 누르는 시점의 한국인/외국인 설문 집계를 기준으로 생성됩니다.")
 
 
 def render_korean_view(survey: dict[str, object]) -> None:
@@ -747,7 +977,7 @@ def render_survey_dashboard() -> None:
     else:
         render_overall_view(korean_survey, foreign_survey)
 
-    render_downloads()
+    render_downloads(korean_survey, foreign_survey)
 
 
 def main() -> None:
