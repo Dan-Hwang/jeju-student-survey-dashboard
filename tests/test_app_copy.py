@@ -24,6 +24,12 @@ class AppCopyTest(unittest.TestCase):
         self.assertIn("상세 조사 결과", self.app_text)
         self.assertNotIn("JEJU EXCHANGE SURVEY", self.app_text)
 
+    def test_app_renders_product_preview_with_missing_asset_fallback(self) -> None:
+        self.assertIn("render_product_preview", self.app_text)
+        self.assertIn("synapspot-question-preview.png", self.app_text)
+        self.assertIn("synapspot-meetings-preview.png", self.app_text)
+        self.assertIn("미리보기 이미지를 준비 중입니다", self.app_text)
+
 
 if __name__ == "__main__":
     unittest.main()

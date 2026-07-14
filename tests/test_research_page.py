@@ -1,4 +1,5 @@
 import unittest
+from pathlib import Path
 
 from src.research_page import (
     build_research_view_model,
@@ -64,6 +65,10 @@ class ResearchPageTest(unittest.TestCase):
         self.assertIn("파티", html)
         self.assertIn("출처", html)
         self.assertIn("신청", html)
+
+    def test_product_preview_assets_exist(self) -> None:
+        self.assertTrue(Path("assets/synapspot-question-preview.png").is_file())
+        self.assertTrue(Path("assets/synapspot-meetings-preview.png").is_file())
 
 
 if __name__ == "__main__":
