@@ -41,6 +41,10 @@ class AppCopyTest(unittest.TestCase):
         self.assertIn('["전체 응답", "이동·동행", "정보 탐색"]', self.app_text)
         self.assertIn("build_focus_view_model", self.app_text)
 
+    def test_presentation_styles_the_actual_streamlit_button_group(self) -> None:
+        self.assertIn('div[data-testid="stButtonGroup"]', self.app_text)
+        self.assertNotIn('div[data-testid="stSegmentedControl"]', self.app_text)
+
     def test_dynamic_openchat_summary_avoids_broken_particles(self) -> None:
         self.assertIn("수요가 많이 나타났어요", self.app_text)
         self.assertNotIn("을 많이 찾고 있어요", self.app_text)

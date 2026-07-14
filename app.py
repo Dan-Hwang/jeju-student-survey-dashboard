@@ -124,11 +124,11 @@ section[data-testid="stSidebar"] {
     display: none;
 }
 
-div[data-testid="stSegmentedControl"] {
+div[data-testid="stButtonGroup"] {
     margin: 1rem 0 1.25rem;
 }
 
-div[data-testid="stSegmentedControl"] button {
+div[data-testid="stButtonGroup"] button {
     min-height: 3rem;
     font-weight: 800;
 }
