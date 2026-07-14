@@ -472,7 +472,7 @@ def _product_page(
         column_width,
         "02 · TRUST THE ANSWER",
         "근거 있는 AI 질문",
-        "공지와 생활정보를 묻고 답변과 함께 출처·신뢰도를 확인합니다.",
+        "공지와 생활정보를 묻고 출처·신뢰도를 함께 확인합니다.",
         font,
         TEAL,
         TEAL_SOFT,
