@@ -18,6 +18,12 @@ class AppCopyTest(unittest.TestCase):
         for term in hidden_terms:
             self.assertNotIn(term, self.app_text)
 
+    def test_app_connects_research_to_synapspot(self) -> None:
+        self.assertIn("render_research_intro", self.app_text)
+        self.assertIn("product_bridge_html", self.app_text)
+        self.assertIn("상세 조사 결과", self.app_text)
+        self.assertNotIn("JEJU EXCHANGE SURVEY", self.app_text)
+
 
 if __name__ == "__main__":
     unittest.main()

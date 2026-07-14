@@ -15,6 +15,11 @@ from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 
+from src.research_page import (
+    build_research_view_model,
+    product_bridge_html,
+    research_story_html,
+)
 from src.survey_dashboard import get_foreign_survey, get_public_survey, pct
 
 
@@ -41,8 +46,8 @@ html, body, [data-testid="stAppViewContainer"], .stApp {
 }
 
 .main .block-container {
-    max-width: 880px;
-    padding: 1rem 1rem 4rem;
+    max-width: 1120px;
+    padding: 1.25rem 1rem 4rem;
 }
 
 [data-testid="stHeader"], footer, #MainMenu {
@@ -79,16 +84,9 @@ p, li, .stMarkdown, [data-testid="stCaptionContainer"] {
 
 div[data-testid="stVerticalBlockBorderWrapper"] {
     border-color: var(--ara-line);
-    border-radius: 20px;
+    border-radius: 8px;
     background: var(--ara-card);
-    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
-}
-
-div[data-testid="stVerticalBlockBorderWrapper"]:has(h1) {
-    border-color: #bfdbfe;
-    background:
-        linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(20, 184, 166, 0.08)),
-        #ffffff;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
 }
 
 div[data-testid="stProgress"] {
@@ -100,14 +98,14 @@ div[data-testid="stProgress"] > div > div {
 }
 
 div[data-testid="stProgress"] > div > div > div {
-    background: linear-gradient(90deg, var(--ara-blue), var(--ara-teal));
+    background: var(--ara-teal);
 }
 
 .stButton > button,
 div.stDownloadButton > button {
     width: 100%;
     min-height: 2.8rem;
-    border-radius: 12px;
+    border-radius: 8px;
     border: 1px solid #cbd5e1;
     background: #ffffff;
     color: var(--ara-text);
@@ -138,13 +136,13 @@ section[data-testid="stSidebar"] {
     animation: araFadeUp 0.35s ease-out both;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 680px) {
     .main .block-container {
-        padding: 0.7rem 0.7rem 3.4rem;
+        padding: 0.75rem 0.75rem 3.5rem;
     }
 
     div[data-testid="stVerticalBlockBorderWrapper"] {
-        border-radius: 16px;
+        border-radius: 8px;
         box-shadow: 0 8px 20px rgba(15, 23, 42, 0.045);
     }
 }
@@ -192,11 +190,9 @@ body {
 .chart-card {
     width: 100%;
     border: 1px solid #dbe4ef;
-    border-radius: 20px;
-    background:
-        linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,252,0.96)),
-        #ffffff;
-    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.055);
+    border-radius: 8px;
+    background: #ffffff;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
     padding: clamp(16px, 4vw, 24px);
 }
 
@@ -216,7 +212,7 @@ body {
 
 .summary-card {
     min-height: 126px;
-    border-radius: 18px;
+    border-radius: 8px;
     padding: 16px;
     background: #f8fafc;
     border: 1px solid #e2e8f0;
@@ -231,7 +227,7 @@ body {
     top: 0;
     width: 5px;
     height: 100%;
-    background: linear-gradient(180deg, #2563eb, #0f766e);
+    background: #0f766e;
 }
 
 .summary-label {
@@ -285,7 +281,7 @@ body {
     height: 100%;
     min-width: 9px;
     border-radius: 999px;
-    background: linear-gradient(90deg, #2563eb, #0f766e);
+    background: #0f766e;
 }
 
 .bar-value {
@@ -481,24 +477,32 @@ def intent_chart_html(intent: list[tuple[str, int]], total: int) -> str:
 """
 
 
-def render_header(korean_survey: dict[str, object], foreign_survey: dict[str, object]) -> None:
-    korean_total = int(korean_survey["data"]["n"])
-    foreign_total = int(foreign_survey["data"]["n"])
-    with st.container(border=True):
-        st.caption("JEJU EXCHANGE SURVEY")
-        st.title("교류학생 생활 플랫폼 수요조사")
-        st.write(
-            "한국인 학생 설문과 외국인 학생 설문을 함께 보며, 이동/동행 모집/오픈채팅 이용 불편을 비교합니다."
-        )
+def render_research_intro(korean_survey: dict[str, object], foreign_survey: dict[str, object]) -> None:
+    model = build_research_view_model(korean_survey, foreign_survey)
+    render_html(research_story_html(model), 1080)
+    render_html(product_bridge_html(model), 610)
+
+
+def render_data_status(korean_survey: dict[str, object], foreign_survey: dict[str, object]) -> None:
+    status_col, refresh_col = st.columns([5, 1])
+    with status_col:
         st.caption(
-            f"한국인 {korean_total}명 · 외국인 {foreign_total}명 · 마지막 갱신 {korean_survey['loaded_at']}"
+            "데이터 기준 · "
+            f"한국인 {source_label(str(korean_survey.get('source', '')))} · "
+            f"외국인 {source_label(str(foreign_survey.get('source', '')))} · "
+            f"마지막 집계 {korean_survey.get('loaded_at', '-')}"
         )
-        if korean_survey.get("error"):
-            st.warning(f"{korean_survey['error']}로 인해 한국인 설문은 저장된 CSV 기준 결과를 표시합니다.")
-        elif korean_survey.get("source") != "Google Sheets":
-            st.warning("Google Sheets 연결 전까지 저장된 CSV 기준 결과를 표시합니다.")
-        if foreign_survey.get("error"):
-            st.warning(str(foreign_survey["error"]))
+    with refresh_col:
+        if st.button("↻ 새로고침", use_container_width=True):
+            st.cache_data.clear()
+            st.rerun()
+
+    if korean_survey.get("error"):
+        st.warning(f"{korean_survey['error']}로 인해 한국인 설문은 저장된 CSV 기준 결과를 표시합니다.")
+    elif korean_survey.get("source") != "Google Sheets":
+        st.warning("한국인 설문은 Google Sheets 연결 전까지 저장된 CSV 기준 결과를 표시합니다.")
+    if foreign_survey.get("error"):
+        st.warning(str(foreign_survey["error"]))
 
 
 def render_summary(data: dict[str, object], total: int) -> None:
@@ -957,10 +961,10 @@ def render_survey_dashboard() -> None:
     korean_survey = get_public_survey()
     foreign_survey = get_foreign_survey()
 
-    render_header(korean_survey, foreign_survey)
-    if st.button("데이터 새로고침", use_container_width=True):
-        st.cache_data.clear()
-        st.rerun()
+    render_research_intro(korean_survey, foreign_survey)
+    render_data_status(korean_survey, foreign_survey)
+    st.markdown("## 상세 조사 결과")
+    st.caption("전체 흐름을 먼저 보고, 필요한 집단과 항목을 골라 자세히 확인해보세요.")
     selected_view = st.radio(
         "보기 선택",
         ["전체 요약", "한국인 설문", "외국인 설문", "비교 요약"],
