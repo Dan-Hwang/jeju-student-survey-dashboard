@@ -60,7 +60,7 @@ class PresentationPdfTest(unittest.TestCase):
         self.assertIn("39명", text)
         self.assertIn("이동과 동행 모집", text)
         self.assertIn("공지와 생활정보 탐색", text)
-        self.assertIn("이동·동행 파티", text)
+        self.assertIn("이동/동행 파티", text)
         self.assertIn("근거 있는 AI 질문", text)
 
     def test_missing_preview_images_do_not_break_pdf(self) -> None:

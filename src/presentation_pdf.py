@@ -132,7 +132,7 @@ def _page_base(pdf: canvas.Canvas, page_number: int, generated_at: str, font: st
     pdf.line(MARGIN, 27, PAGE_WIDTH - MARGIN, 27)
     pdf.setFont(font, 7.5)
     pdf.setFillColor(MUTED)
-    pdf.drawString(MARGIN, 15, f"제주대학교 교류학생 생활 플랫폼 수요조사 · {generated_at}")
+    pdf.drawString(MARGIN, 15, f"제주대학교 교류학생 생활 플랫폼 수요조사 | {generated_at}")
     pdf.drawRightString(PAGE_WIDTH - MARGIN, 15, f"{page_number} / 4")
 
 
@@ -215,7 +215,7 @@ def _rank_panel(
         )
         pdf.setFont(font, 7.2)
         pdf.setFillColor(MUTED)
-        pdf.drawRightString(x + width - 18, row_y, f"{value}명 · {pct(value, total)}")
+        pdf.drawRightString(x + width - 18, row_y, f"{value}명 | {pct(value, total)}")
         row_y -= 27
 
 
@@ -306,7 +306,7 @@ def _cover_page(
     y -= 5
     _draw_wrapped(
         pdf,
-        "한국인·외국인 교류학생의 이동, 동행 모집, 생활정보 탐색 경험에서 반복된 문제를 제품 기능과 연결했습니다.",
+        "한국인/외국인 교류학생의 이동, 동행 모집, 생활정보 탐색 경험에서 반복된 문제를 제품 기능과 연결했습니다.",
         MARGIN + 24,
         y,
         CONTENT_WIDTH - 48,
@@ -321,7 +321,7 @@ def _cover_page(
     pdf.drawString(
         MARGIN + 24,
         575,
-        f"한국인 {model['korean_total']}명 · 외국인 {model['foreign_total']}명 · 생성 {generated_at}",
+        f"한국인 {model['korean_total']}명 | 외국인 {model['foreign_total']}명 | 생성 {generated_at}",
     )
 
     gap = 10
@@ -363,7 +363,7 @@ def _cover_page(
         panel_width,
         "02",
         "공지와 생활정보 탐색",
-        "외국인 학생은 교통 문제와 함께 공지·생활정보를 한곳에서 찾고 신뢰도를 확인해야 했습니다.",
+        "외국인 학생은 교통 문제와 함께 공지/생활정보를 한곳에서 찾고 신뢰도를 확인해야 했습니다.",
         font,
         TEAL,
         TEAL_SOFT,
@@ -373,7 +373,7 @@ def _cover_page(
     pdf.drawString(
         MARGIN,
         194,
-        f"데이터 기준 · 한국인 {_source_label(korean_survey.get('source'))} · 외국인 {_source_label(foreign_survey.get('source'))}",
+        f"데이터 기준 | 한국인 {_source_label(korean_survey.get('source'))} | 외국인 {_source_label(foreign_survey.get('source'))}",
     )
 
 
@@ -458,9 +458,9 @@ def _product_page(
         MARGIN,
         feature_y,
         column_width,
-        "01 · MOVE TOGETHER",
-        "이동·동행 파티",
-        "조건별 탐색, 파티 생성, 신청·승인, 참가자 채팅을 한 흐름에서 관리합니다.",
+        "01 | MOVE TOGETHER",
+        "이동/동행 파티",
+        "조건별 탐색, 파티 생성, 신청/승인, 참가자 채팅을 한 흐름에서 관리합니다.",
         font,
         CORAL,
         CORAL_SOFT,
@@ -470,9 +470,9 @@ def _product_page(
         MARGIN + column_width + gap,
         feature_y,
         column_width,
-        "02 · TRUST THE ANSWER",
+        "02 | TRUST THE ANSWER",
         "근거 있는 AI 질문",
-        "공지와 생활정보를 묻고 출처·신뢰도를 함께 확인합니다.",
+        "공지와 생활정보를 묻고 출처/신뢰도를 함께 확인합니다.",
         font,
         TEAL,
         TEAL_SOFT,
@@ -531,7 +531,7 @@ def build_presentation_pdf(
     _problem_page(
         pdf,
         2,
-        "PROBLEM 01 · MOVE TOGETHER",
+        "PROBLEM 01 | MOVE TOGETHER",
         "이동과 동행 모집",
         "한국인 교류학생 응답에서 이동 비용과 동행 탐색 문제가 어떻게 나타났는지 살펴봅니다.",
         "같은 시간과 목적지를 가진 사람 찾기",
@@ -546,9 +546,9 @@ def build_presentation_pdf(
     _problem_page(
         pdf,
         3,
-        "PROBLEM 02 · TRUST THE INFORMATION",
+        "PROBLEM 02 | TRUST THE INFORMATION",
         "공지와 생활정보 탐색",
-        "외국인 교류학생 응답에서 교통과 공지·생활정보 탐색 문제가 어떻게 나타났는지 살펴봅니다.",
+        "외국인 교류학생 응답에서 교통과 공지/생활정보 탐색 문제가 어떻게 나타났는지 살펴봅니다.",
         "한곳에서 찾고 믿을 만한지 확인하기",
         "흩어진 정보를 검색하고 출처와 최신성을 함께 확인할 수 있는 흐름이 필요합니다.",
         foreign_survey["data"],
