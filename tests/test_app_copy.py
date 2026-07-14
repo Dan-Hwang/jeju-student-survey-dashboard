@@ -42,6 +42,14 @@ class AppCopyTest(unittest.TestCase):
         self.assertNotIn("streamlit.components.v1", self.app_text)
         self.assertNotIn("use_container_width", self.app_text)
 
+    def test_download_uses_presentation_pdf_renderer(self) -> None:
+        self.assertIn("from src.presentation_pdf import build_presentation_pdf", self.app_text)
+        self.assertIn("question_preview=QUESTION_PREVIEW", self.app_text)
+        self.assertIn("meetings_preview=MEETINGS_PREVIEW", self.app_text)
+        self.assertIn("jeju-student-survey-research-preview.streamlit.app", self.app_text)
+        self.assertNotIn("def build_current_pdf", self.app_text)
+        self.assertNotIn("def draw_pdf_metric", self.app_text)
+
 
 if __name__ == "__main__":
     unittest.main()
