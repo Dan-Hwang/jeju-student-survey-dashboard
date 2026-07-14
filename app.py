@@ -484,8 +484,8 @@ def intent_chart_html(intent: list[tuple[str, int]], total: int) -> str:
 
 def render_research_intro(korean_survey: dict[str, object], foreign_survey: dict[str, object]) -> None:
     model = build_research_view_model(korean_survey, foreign_survey)
-    render_html(research_story_html(model), 1080)
-    render_html(product_bridge_html(model), 610)
+    st.html(research_story_html(model))
+    st.html(product_bridge_html(model))
 
 
 def render_product_preview() -> None:
@@ -966,7 +966,7 @@ def render_overall_view(korean_survey: dict[str, object], foreign_survey: dict[s
         st.markdown("### 한눈에 보는 결론")
         st.write(
             f"한국인 응답에서는 **{korean_top_pain[0]}**, 외국인 응답에서는 **{foreign_top_pain[0]}** 문제가 크게 보입니다. "
-            f"오픈채팅에서는 한국인 학생은 **{korean_top_openchat[0]}**, 외국인 학생은 **{foreign_top_openchat[0]}**을 많이 찾고 있어요. "
+            f"오픈채팅에서는 한국인 학생에게 **{korean_top_openchat[0]}**, 외국인 학생에게 **{foreign_top_openchat[0]}** 수요가 많이 나타났어요. "
             "따라서 첫 서비스 검증은 실시간 이동/동행 모집을 중심으로 두고, 외국인 학생에게는 공지/생활정보 탐색을 함께 보강하는 방향이 좋습니다."
         )
 

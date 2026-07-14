@@ -30,6 +30,14 @@ class AppCopyTest(unittest.TestCase):
         self.assertIn("synapspot-meetings-preview.png", self.app_text)
         self.assertIn("미리보기 이미지를 준비 중입니다", self.app_text)
 
+    def test_research_story_uses_intrinsic_height_html(self) -> None:
+        self.assertIn("st.html(research_story_html", self.app_text)
+        self.assertIn("st.html(product_bridge_html", self.app_text)
+
+    def test_dynamic_openchat_summary_avoids_broken_particles(self) -> None:
+        self.assertIn("수요가 많이 나타났어요", self.app_text)
+        self.assertNotIn("을 많이 찾고 있어요", self.app_text)
+
 
 if __name__ == "__main__":
     unittest.main()
