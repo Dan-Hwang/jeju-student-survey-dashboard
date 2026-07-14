@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any
 
 import streamlit as st
-import streamlit.components.v1 as components
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase import pdfmetrics
@@ -173,8 +172,8 @@ def get_count(items: list[tuple[str, int]], label: str, default: int = 0) -> int
     return dict(items).get(label, default)
 
 
-def render_html(html: str, height: int) -> None:
-    components.html(html, height=height, scrolling=False)
+def render_html(html: str, _height: int) -> None:
+    st.html(html)
 
 
 def chart_theme() -> str:
@@ -500,7 +499,7 @@ def render_product_preview() -> None:
     for column, (image_path, title, description) in zip(columns, previews):
         with column:
             if image_path.exists():
-                st.image(str(image_path), use_container_width=True)
+                st.image(str(image_path), width="stretch")
             else:
                 st.info("미리보기 이미지를 준비 중입니다.")
             st.markdown(f"### {title}")
@@ -517,7 +516,7 @@ def render_data_status(korean_survey: dict[str, object], foreign_survey: dict[st
             f"마지막 집계 {korean_survey.get('loaded_at', '-')}"
         )
     with refresh_col:
-        if st.button("↻ 새로고침", use_container_width=True):
+        if st.button("↻ 새로고침", width="stretch"):
             st.cache_data.clear()
             st.rerun()
 
@@ -626,13 +625,13 @@ def render_comments_section(comments: list[str], key_prefix: str) -> None:
         if total_pages > 1:
             previous_col, page_col, next_col = st.columns([1, 1, 1])
             with previous_col:
-                if st.button("이전", key=f"{key_prefix}_comments_prev", disabled=current_page == 0, use_container_width=True):
+                if st.button("이전", key=f"{key_prefix}_comments_prev", disabled=current_page == 0, width="stretch"):
                     st.session_state[page_key] = current_page - 1
                     st.rerun()
             with page_col:
                 st.markdown(f"<div style='text-align:center; padding-top:0.45rem;'>{current_page + 1} / {total_pages}</div>", unsafe_allow_html=True)
             with next_col:
-                if st.button("다음", key=f"{key_prefix}_comments_next", disabled=current_page >= total_pages - 1, use_container_width=True):
+                if st.button("다음", key=f"{key_prefix}_comments_next", disabled=current_page >= total_pages - 1, width="stretch"):
                     st.session_state[page_key] = current_page + 1
                     st.rerun()
 
@@ -878,7 +877,7 @@ def render_downloads(korean_survey: dict[str, Any], foreign_survey: dict[str, An
             data=build_current_pdf(korean_survey, foreign_survey),
             file_name="jeju-student-survey-live-report.pdf",
             mime="application/pdf",
-            use_container_width=True,
+            width="stretch",
         )
         st.caption("PDF는 다운로드 버튼을 누르는 시점의 한국인/외국인 설문 집계를 기준으로 생성됩니다.")
 

@@ -38,6 +38,10 @@ class AppCopyTest(unittest.TestCase):
         self.assertIn("수요가 많이 나타났어요", self.app_text)
         self.assertNotIn("을 많이 찾고 있어요", self.app_text)
 
+    def test_app_avoids_deprecated_streamlit_rendering_apis(self) -> None:
+        self.assertNotIn("streamlit.components.v1", self.app_text)
+        self.assertNotIn("use_container_width", self.app_text)
+
 
 if __name__ == "__main__":
     unittest.main()
