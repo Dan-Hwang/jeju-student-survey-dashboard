@@ -25,6 +25,8 @@ def build_research_view_model(
     foreign_positive = _count(foreign["intent"], "긍정")
     positive_total = korean_positive + foreign_positive
     total = korean_total + foreign_total
+    dot_count = min(total, 60)
+    responses_per_dot = max(1, (total + 59) // 60)
 
     return {
         "total": total,
@@ -39,6 +41,12 @@ def build_research_view_model(
         "positive_total": positive_total,
         "positive_pct": pct(positive_total, total),
         "loaded_at": str(korean_survey.get("loaded_at", "-")),
+        "korean_pain": list(korean.get("pain", [])),
+        "korean_find": list(korean.get("openchat_find", [])),
+        "foreign_pain": list(foreign.get("pain", [])),
+        "foreign_find": list(foreign.get("openchat_find", [])),
+        "dot_count": dot_count,
+        "responses_per_dot": responses_per_dot,
     }
 
 

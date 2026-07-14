@@ -38,6 +38,34 @@ class ResearchPageTest(unittest.TestCase):
         self.assertEqual(result["foreign_top_find"], ("공지", 9))
         self.assertEqual(result["positive_total"], 29)
         self.assertEqual(result["positive_pct"], "82.9%")
+        self.assertEqual(result["korean_pain"], [("버스 노선", 10)])
+        self.assertEqual(result["foreign_find"], [("공지", 9)])
+        self.assertEqual(result["dot_count"], 35)
+        self.assertEqual(result["responses_per_dot"], 1)
+
+    def test_caps_respondent_dots_for_large_samples(self) -> None:
+        korean = {
+            "data": {
+                "n": 80,
+                "pain": [],
+                "openchat_find": [],
+                "intent": [],
+            }
+        }
+        foreign = {
+            "data": {
+                "n": 40,
+                "pain": [],
+                "openchat_find": [],
+                "intent": [],
+            }
+        }
+
+        result = build_research_view_model(korean, foreign)
+
+        self.assertEqual(result["total"], 120)
+        self.assertEqual(result["dot_count"], 60)
+        self.assertEqual(result["responses_per_dot"], 2)
 
     def test_story_escapes_sheet_labels(self) -> None:
         model = {
