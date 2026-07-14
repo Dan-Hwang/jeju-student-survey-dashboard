@@ -20,7 +20,8 @@ class AppCopyTest(unittest.TestCase):
 
     def test_app_connects_research_to_synapspot(self) -> None:
         self.assertIn("render_research_intro", self.app_text)
-        self.assertIn("product_bridge_html", self.app_text)
+        self.assertIn("build_focus_view_model", self.app_text)
+        self.assertIn("focus_panel_html", self.app_text)
         self.assertIn("전체 데이터 살펴보기", self.app_text)
         self.assertNotIn("JEJU EXCHANGE SURVEY", self.app_text)
 
@@ -31,8 +32,14 @@ class AppCopyTest(unittest.TestCase):
         self.assertIn("미리보기 이미지를 준비 중입니다", self.app_text)
 
     def test_research_story_uses_intrinsic_height_html(self) -> None:
-        self.assertIn("st.html(research_story_html", self.app_text)
-        self.assertIn("st.html(product_bridge_html", self.app_text)
+        self.assertIn("st.html(research_hero_html", self.app_text)
+        self.assertIn("st.html(focus_panel_html", self.app_text)
+
+    def test_presentation_uses_persistent_focus_control(self) -> None:
+        self.assertIn("st.segmented_control", self.app_text)
+        self.assertIn('key="presentation_focus"', self.app_text)
+        self.assertIn('["전체 응답", "이동·동행", "정보 탐색"]', self.app_text)
+        self.assertIn("build_focus_view_model", self.app_text)
 
     def test_dynamic_openchat_summary_avoids_broken_particles(self) -> None:
         self.assertIn("수요가 많이 나타났어요", self.app_text)

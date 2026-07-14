@@ -4,6 +4,7 @@ from pathlib import Path
 from src.research_page import (
     build_focus_view_model,
     build_research_view_model,
+    focus_panel_html,
     product_bridge_html,
     research_story_html,
 )
@@ -158,6 +159,30 @@ class ResearchPageTest(unittest.TestCase):
         self.assertIn("2명", html)
         self.assertIn("100.0%", html)
         self.assertIn('tabindex="0"', html)
+
+    def test_focus_panel_removes_decorative_hover(self) -> None:
+        html = research_story_html(self.story_model())
+
+        self.assertNotIn("translateX(4px)", html)
+        self.assertNotIn(":has(.story-bar-row:hover)", html)
+
+    def test_focus_panel_changes_content(self) -> None:
+        model = self.story_model()
+
+        movement = focus_panel_html(build_focus_view_model(model, "이동·동행"))
+        information = focus_panel_html(build_focus_view_model(model, "정보 탐색"))
+
+        self.assertIn('data-focus="이동·동행"', movement)
+        self.assertIn("이동 비용보다 더 오래 걸린 것은", movement)
+        self.assertIn("이동·동행 파티", movement)
+        self.assertIn("버스 노선", movement)
+        self.assertNotIn("근거 있는 AI 질문", movement)
+
+        self.assertIn('data-focus="정보 탐색"', information)
+        self.assertIn("믿어도 되는지", information)
+        self.assertIn("근거 있는 AI 질문", information)
+        self.assertIn("공지", information)
+        self.assertNotIn("이동·동행 파티", information)
 
     def test_story_honors_reduced_motion_and_mobile_layout(self) -> None:
         html = research_story_html(self.story_model())

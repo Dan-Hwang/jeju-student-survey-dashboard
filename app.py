@@ -8,9 +8,10 @@ import streamlit as st
 
 from src.presentation_pdf import build_presentation_pdf
 from src.research_page import (
+    build_focus_view_model,
     build_research_view_model,
-    product_bridge_html,
-    research_story_html,
+    focus_panel_html,
+    research_hero_html,
 )
 from src.survey_dashboard import get_foreign_survey, get_public_survey, pct
 
@@ -121,6 +122,15 @@ div.stDownloadButton > button:hover {
 
 section[data-testid="stSidebar"] {
     display: none;
+}
+
+div[data-testid="stSegmentedControl"] {
+    margin: 1rem 0 1.25rem;
+}
+
+div[data-testid="stSegmentedControl"] button {
+    min-height: 3rem;
+    font-weight: 800;
 }
 
 @keyframes araFadeUp {
@@ -495,21 +505,51 @@ def intent_chart_html(intent: list[tuple[str, int]], total: int) -> str:
 """
 
 
-def render_research_intro(korean_survey: dict[str, object], foreign_survey: dict[str, object]) -> None:
+def render_research_intro(
+    korean_survey: dict[str, object], foreign_survey: dict[str, object]
+) -> dict[str, object]:
     model = build_research_view_model(korean_survey, foreign_survey)
-    st.html(research_story_html(model))
-    st.html(product_bridge_html(model))
+    st.html(research_hero_html(model))
+    st.markdown("## 어떤 문제부터 살펴볼까요?")
+    st.caption("선택하면 관련 설문 근거와 연결된 시냅스팟 기능이 함께 바뀝니다.")
+    focus = st.segmented_control(
+        "발표 주제 선택",
+        ["전체 응답", "이동·동행", "정보 탐색"],
+        default="전체 응답",
+        key="presentation_focus",
+        width="stretch",
+        label_visibility="collapsed",
+    )
+    focus_model = build_focus_view_model(model, str(focus or "전체 응답"))
+    st.html(focus_panel_html(focus_model))
+    return focus_model
 
 
-def render_product_preview() -> None:
+def render_product_preview(focus_model: dict[str, object]) -> None:
     st.markdown("## 시냅스팟에서는 이렇게 해결합니다")
-    st.caption("수요조사에서 확인한 두 문제와 직접 연결되는 실제 모바일 화면입니다.")
+    st.caption(
+        f"현재 선택한 ‘{focus_model['focus']}’ 흐름과 연결되는 실제 모바일 화면입니다."
+    )
 
-    previews = [
-        (MEETINGS_PREVIEW, "이동·동행 파티", "모임을 찾고 만들고 신청 상태를 관리합니다."),
-        (QUESTION_PREVIEW, "근거 있는 AI 질문", "답변과 함께 출처와 신뢰도를 확인합니다."),
-    ]
-    columns = st.columns(2)
+    preview_lookup = {
+        "meetings": (
+            MEETINGS_PREVIEW,
+            "이동·동행 파티",
+            "모임을 찾고 만들고 신청 상태를 관리합니다.",
+        ),
+        "question": (
+            QUESTION_PREVIEW,
+            "근거 있는 AI 질문",
+            "답변과 함께 출처와 신뢰도를 확인합니다.",
+        ),
+    }
+    selected_asset = focus_model.get("product_asset")
+    if selected_asset in preview_lookup:
+        previews = [preview_lookup[str(selected_asset)]]
+    else:
+        previews = [preview_lookup["meetings"], preview_lookup["question"]]
+
+    columns = st.columns(len(previews))
     for column, (image_path, title, description) in zip(columns, previews):
         with column:
             st.markdown(f"### {title}")
@@ -772,8 +812,8 @@ def render_survey_dashboard() -> None:
     korean_survey = get_public_survey()
     foreign_survey = get_foreign_survey()
 
-    render_research_intro(korean_survey, foreign_survey)
-    render_product_preview()
+    focus_model = render_research_intro(korean_survey, foreign_survey)
+    render_product_preview(focus_model)
     render_data_status(korean_survey, foreign_survey)
     st.markdown("## 전체 데이터 살펴보기")
     st.caption("발표 흐름에서 다룬 근거와 전체 응답 항목을 직접 비교할 수 있습니다.")

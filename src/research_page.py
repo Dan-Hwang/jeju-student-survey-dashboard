@@ -376,15 +376,6 @@ body {
 }
 .story-bar-row {
   outline: none;
-  transition: opacity .2s ease, transform .2s ease;
-}
-.story-bar-list:has(.story-bar-row:hover) .story-bar-row:not(:hover),
-.story-bar-list:has(.story-bar-row:focus-visible) .story-bar-row:not(:focus-visible) {
-  opacity: .42;
-}
-.story-bar-row:hover,
-.story-bar-row:focus-visible {
-  transform: translateX(4px);
 }
 .story-bar-row:focus-visible {
   box-shadow: 0 0 0 3px rgba(61,124,244,.32);
@@ -506,6 +497,76 @@ body {
   font-size: 11px;
   line-height: 1.6;
 }
+.focus-panel {
+  display: grid;
+  gap: 28px;
+  padding: 48px;
+  border: 1px solid var(--story-line);
+  border-radius: 8px;
+  background: var(--story-paper);
+}
+.focus-panel-head {
+  max-width: 820px;
+}
+.focus-panel-head > span {
+  color: var(--story-teal);
+  font-size: 11px;
+  font-weight: 900;
+}
+.focus-panel-head h2 {
+  margin: 10px 0 0;
+  color: var(--story-navy);
+  font-size: 42px;
+  line-height: 1.24;
+  font-weight: 900;
+  word-break: keep-all;
+}
+.focus-panel-head p {
+  margin: 16px 0 0;
+  color: var(--story-muted);
+  font-size: 14px;
+  line-height: 1.75;
+}
+.focus-panel.movement { background: var(--story-coral-soft); }
+.focus-panel.information { background: var(--story-teal-soft); }
+.focus-panel.movement .focus-panel-head > span { color: var(--story-coral); }
+.focus-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 38px;
+}
+.focus-chart-grid article {
+  min-width: 0;
+  padding-top: 24px;
+  border-top: 1px solid rgba(16,33,61,.15);
+}
+.focus-chart-grid h3 {
+  margin: 0 0 18px;
+  color: var(--story-navy);
+  font-size: 17px;
+  font-weight: 900;
+}
+.focus-insight {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: center;
+  padding: 22px 24px;
+  border-left: 4px solid var(--story-teal);
+  background: rgba(255,255,255,.72);
+}
+.movement .focus-insight { border-left-color: var(--story-coral); }
+.focus-insight strong {
+  color: var(--story-navy);
+  font-size: 15px;
+  line-height: 1.7;
+}
+.focus-insight span {
+  color: var(--story-muted);
+  font-size: 12px;
+  font-weight: 850;
+  white-space: nowrap;
+}
 @media (max-width: 900px) {
   .story-hero {
     min-height: 0;
@@ -522,7 +583,9 @@ body {
   .story-problems > h2 { font-size: 40px; }
   .problem-path h3 { font-size: 31px; }
   .scene-copy h2,
-  .story-heading h2 { font-size: 38px; }
+  .story-heading h2,
+  .focus-panel-head h2 { font-size: 38px; }
+  .focus-chart-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 680px) {
   .research-page { gap: 48px; }
@@ -561,6 +624,13 @@ body {
   .scene-copy h2 { font-size: 31px; }
   .problem-path h3 { font-size: 28px; }
   .story-heading h2 { font-size: 31px; }
+  .focus-panel {
+    gap: 24px;
+    padding: 32px 20px;
+  }
+  .focus-panel-head h2 { font-size: 30px; }
+  .focus-insight { grid-template-columns: 1fr; }
+  .focus-insight span { white-space: normal; }
   .story-bar-head {
     display: grid;
     grid-template-columns: 1fr;
@@ -581,8 +651,7 @@ body {
     opacity: 1;
     transform: none;
   }
-  .problem-path::after,
-  .story-bar-row { transition: none; }
+  .problem-path::after { transition: none; }
 }
 </style>
 """
@@ -638,6 +707,84 @@ def _evidence(label: object, count: object, total: int) -> str:
         f'<span class="evidence">{escape(str(label))} '
         f'{int(count)}명 · {escape(pct(int(count), total))}</span>'
     )
+
+
+def research_hero_html(model: dict[str, object]) -> str:
+    total = int(model["total"])
+    korean_total = int(model["korean_total"])
+    foreign_total = int(model["foreign_total"])
+    return f"""
+{research_page_css()}
+<header class="story-hero">
+  <div class="hero-copy-block">
+    <p class="eyebrow">JEJU EXCHANGE STUDENT RESEARCH</p>
+    <h1><em>{total}명</em>의 응답이<br>두 가지 문제를 가리켰습니다</h1>
+    <p class="hero-copy">한국인과 외국인 교류학생이 제주에서 이동하고, 사람을 만나고, 생활정보를 찾으며 겪은 경험을 조사했습니다.</p>
+    <div class="hero-meta">
+      <span>한국인 {korean_total}명</span>
+      <span>외국인 {foreign_total}명</span>
+      <span>마지막 집계 {escape(str(model['loaded_at']))}</span>
+    </div>
+  </div>
+  {_respondent_dots_html(model)}
+</header>
+"""
+
+
+def _overview_problems_html(problems: list[dict[str, str]]) -> str:
+    cards = []
+    for problem in problems:
+        cards.append(
+            f'<article class="problem-path {escape(problem["tone"])}">'
+            f'<span>{escape(problem["number"])}</span>'
+            f'<h3>{escape(problem["title"])}</h3>'
+            f'<p>{escape(problem["description"])}</p></article>'
+        )
+    return f'<div class="problem-paths">{"".join(cards)}</div>'
+
+
+def focus_panel_html(focus_model: dict[str, object]) -> str:
+    focus = str(focus_model["focus"])
+    tone = str(focus_model["tone"])
+    title = escape(str(focus_model["title"]))
+    kicker = escape(str(focus_model["kicker"]))
+    description = escape(str(focus_model["description"]))
+    interpretation = escape(str(focus_model["interpretation"]))
+    product_title = escape(str(focus_model["product_title"]))
+
+    if focus == "전체 응답":
+        problems = list(focus_model["problems"])
+        body = _overview_problems_html(problems)
+    else:
+        total = int(focus_model["total"])
+        body = f"""
+<div class="focus-chart-grid">
+  <article>
+    <h3>제주에서 불편했던 점</h3>
+    {_story_bars_html(list(focus_model['pain_items']), total, tone)}
+  </article>
+  <article>
+    <h3>오픈채팅에서 찾은 것</h3>
+    {_story_bars_html(list(focus_model['find_items']), total, tone)}
+  </article>
+</div>
+"""
+
+    return f"""
+{research_page_css()}
+<section class="focus-panel {escape(tone)}" data-focus="{escape(focus)}" aria-live="polite">
+  <div class="focus-panel-head">
+    <span>{kicker}</span>
+    <h2>{title}</h2>
+    <p>{description}</p>
+  </div>
+  {body}
+  <div class="focus-insight">
+    <strong>{interpretation}</strong>
+    <span>이어지는 기능 · {product_title}</span>
+  </div>
+</section>
+"""
 
 
 def research_story_html(model: dict[str, object]) -> str:
