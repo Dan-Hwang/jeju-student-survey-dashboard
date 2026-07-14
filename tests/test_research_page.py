@@ -128,8 +128,14 @@ class ResearchPageTest(unittest.TestCase):
         html = research_story_html(self.story_model())
 
         self.assertIn("prefers-reduced-motion: reduce", html)
+        self.assertIn("@media (max-width: 900px)", html)
         self.assertIn("@media (max-width: 680px)", html)
         self.assertIn("grid-template-columns: 1fr", html)
+
+    def test_story_uses_stable_font_sizes(self) -> None:
+        html = research_story_html(self.story_model())
+
+        self.assertNotIn("font-size: clamp", html)
 
     def test_bridge_names_actual_synapspot_flows(self) -> None:
         html = product_bridge_html({})

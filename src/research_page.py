@@ -115,7 +115,7 @@ body {
   max-width: 650px;
   margin: 0;
   color: #ffffff;
-  font-size: clamp(38px, 5.2vw, 64px);
+  font-size: 64px;
   line-height: 1.12;
   font-weight: 900;
   word-break: keep-all;
@@ -204,7 +204,7 @@ body {
   max-width: 720px;
   margin: 0;
   color: var(--story-navy);
-  font-size: clamp(30px, 4.2vw, 48px);
+  font-size: 48px;
   line-height: 1.2;
   font-weight: 900;
   word-break: keep-all;
@@ -248,7 +248,7 @@ body {
 .problem-path h3 {
   margin: 34px 0 12px;
   color: var(--story-navy);
-  font-size: clamp(25px, 3vw, 35px);
+  font-size: 35px;
   line-height: 1.25;
 }
 .problem-path p {
@@ -278,7 +278,7 @@ body {
 .scene-copy h2 {
   margin: 0;
   color: var(--story-navy);
-  font-size: clamp(29px, 3.8vw, 44px);
+  font-size: 44px;
   line-height: 1.22;
   font-weight: 900;
   word-break: keep-all;
@@ -381,7 +381,7 @@ body {
   max-width: 760px;
   margin: 8px 0 0;
   color: var(--story-navy);
-  font-size: clamp(29px, 4vw, 44px);
+  font-size: 44px;
   line-height: 1.25;
   font-weight: 900;
 }
@@ -441,6 +441,24 @@ body {
   font-size: 11px;
   line-height: 1.6;
 }
+@media (max-width: 900px) {
+  .story-hero {
+    min-height: 0;
+    grid-template-columns: 1fr;
+  }
+  .respondent-visual {
+    width: min(100%, 560px);
+  }
+  .evidence-scene {
+    grid-template-columns: 1fr;
+  }
+  .scene-copy { position: static; }
+  .story-hero h1 { font-size: 52px; }
+  .story-problems > h2 { font-size: 40px; }
+  .problem-path h3 { font-size: 31px; }
+  .scene-copy h2,
+  .story-heading h2 { font-size: 38px; }
+}
 @media (max-width: 680px) {
   .research-page { gap: 48px; }
   .story-hero {
@@ -476,6 +494,8 @@ body {
   }
   .scene-copy { position: static; }
   .scene-copy h2 { font-size: 31px; }
+  .problem-path h3 { font-size: 28px; }
+  .story-heading h2 { font-size: 31px; }
   .story-bar-head {
     display: grid;
     grid-template-columns: 1fr;

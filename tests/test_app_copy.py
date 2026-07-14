@@ -61,6 +61,10 @@ class AppCopyTest(unittest.TestCase):
     def test_page_style_supports_full_width_presentation(self) -> None:
         self.assertIn("max-width: 1180px", self.app_text)
         self.assertIn("scroll-margin-top", self.app_text)
+        self.assertIn('layout="wide"', self.app_text)
+
+    def test_page_style_uses_stable_font_sizes(self) -> None:
+        self.assertNotIn("font-size: clamp", self.app_text)
 
 
 if __name__ == "__main__":

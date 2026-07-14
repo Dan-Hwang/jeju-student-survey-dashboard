@@ -62,18 +62,18 @@ h1, h2, h3 {
 }
 
 h1 {
-    font-size: clamp(1.85rem, 8vw, 3rem) !important;
+    font-size: 3rem !important;
     line-height: 1.15 !important;
     margin-bottom: 0.65rem !important;
 }
 
 h2 {
-    font-size: clamp(1.35rem, 6vw, 2rem) !important;
+    font-size: 2rem !important;
     margin-top: 1.4rem !important;
 }
 
 h3 {
-    font-size: clamp(1.08rem, 4.5vw, 1.35rem) !important;
+    font-size: 1.35rem !important;
 }
 
 p, li, .stMarkdown, [data-testid="stCaptionContainer"] {
@@ -146,6 +146,18 @@ section[data-testid="stSidebar"] {
     div[data-testid="stVerticalBlockBorderWrapper"] {
         border-radius: 8px;
         box-shadow: 0 8px 20px rgba(15, 23, 42, 0.045);
+    }
+
+    h1 {
+        font-size: 1.85rem !important;
+    }
+
+    h2 {
+        font-size: 1.35rem !important;
+    }
+
+    h3 {
+        font-size: 1.08rem !important;
     }
 }
 </style>
@@ -241,7 +253,7 @@ body {
 .summary-value {
     margin-top: 10px;
     color: #172033;
-    font-size: clamp(23px, 6vw, 33px);
+    font-size: 33px;
     line-height: 1.1;
     font-weight: 900;
     overflow-wrap: anywhere;
@@ -364,6 +376,10 @@ body {
     .summary-card {
         min-height: 118px;
         padding: 14px;
+    }
+
+    .summary-value {
+        font-size: 23px;
     }
 
     .bar-row {
@@ -749,7 +765,7 @@ def render_survey_dashboard() -> None:
     st.set_page_config(
         page_title="제주대학교 교류학생 생활 플랫폼 수요조사",
         page_icon="📊",
-        layout="centered",
+        layout="wide",
     )
     apply_page_style()
 
