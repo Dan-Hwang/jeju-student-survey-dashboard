@@ -2,6 +2,7 @@ import unittest
 from pathlib import Path
 
 from src.research_page import (
+    build_focus_view_model,
     build_research_view_model,
     product_bridge_html,
     research_story_html,
@@ -93,6 +94,40 @@ class ResearchPageTest(unittest.TestCase):
         self.assertEqual(result["total"], 120)
         self.assertEqual(result["dot_count"], 60)
         self.assertEqual(result["responses_per_dot"], 2)
+
+    def test_builds_movement_focus_model(self) -> None:
+        model = self.story_model()
+
+        result = build_focus_view_model(model, "이동·동행")
+
+        self.assertEqual(result["focus"], "이동·동행")
+        self.assertEqual(result["total"], model["korean_total"])
+        self.assertEqual(result["pain_items"], model["korean_pain"])
+        self.assertEqual(result["find_items"], model["korean_find"])
+        self.assertEqual(result["product_asset"], "meetings")
+        self.assertEqual(result["tone"], "movement")
+
+    def test_builds_information_focus_model(self) -> None:
+        model = self.story_model()
+
+        result = build_focus_view_model(model, "정보 탐색")
+
+        self.assertEqual(result["focus"], "정보 탐색")
+        self.assertEqual(result["total"], model["foreign_total"])
+        self.assertEqual(result["pain_items"], model["foreign_pain"])
+        self.assertEqual(result["find_items"], model["foreign_find"])
+        self.assertEqual(result["product_asset"], "question")
+        self.assertEqual(result["tone"], "information")
+
+    def test_invalid_focus_falls_back_to_overview(self) -> None:
+        model = self.story_model()
+
+        result = build_focus_view_model(model, "unknown")
+
+        self.assertEqual(result["focus"], "전체 응답")
+        self.assertEqual(result["total"], model["total"])
+        self.assertIsNone(result["product_asset"])
+        self.assertEqual(len(result["problems"]), 2)
 
     def test_story_escapes_sheet_labels(self) -> None:
         model = self.story_model(total=1, korean_total=1, foreign_total=0)

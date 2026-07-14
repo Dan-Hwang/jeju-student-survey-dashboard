@@ -50,6 +50,71 @@ def build_research_view_model(
     }
 
 
+def build_focus_view_model(model: dict[str, object], focus: str) -> dict[str, object]:
+    if focus == "이동·동행":
+        return {
+            "focus": focus,
+            "kicker": "PROBLEM 01",
+            "title": "이동 비용보다 더 오래 걸린 것은 함께 갈 사람을 찾는 일이었습니다",
+            "description": "한국인 교류학생 응답에서 확인한 이동과 모집 관련 상위 결과입니다.",
+            "interpretation": "이동 자체뿐 아니라 같은 시간과 목적지의 동행을 찾는 과정이 반복됐습니다.",
+            "tone": "movement",
+            "total": int(model["korean_total"]),
+            "pain_items": list(model["korean_pain"]),
+            "find_items": list(model["korean_find"]),
+            "product_asset": "meetings",
+            "product_title": "이동·동행 파티",
+            "product_description": "모임을 찾고 만들고 신청 상태를 관리합니다.",
+            "problems": [],
+        }
+
+    if focus == "정보 탐색":
+        return {
+            "focus": focus,
+            "kicker": "PROBLEM 02",
+            "title": "정보를 찾은 뒤에도 믿어도 되는지 확인해야 했습니다",
+            "description": "외국인 교류학생 응답에서 확인한 생활정보 탐색 관련 상위 결과입니다.",
+            "interpretation": "정보의 위치뿐 아니라 최신성과 신뢰도를 다시 확인하는 과정이 필요했습니다.",
+            "tone": "information",
+            "total": int(model["foreign_total"]),
+            "pain_items": list(model["foreign_pain"]),
+            "find_items": list(model["foreign_find"]),
+            "product_asset": "question",
+            "product_title": "근거 있는 AI 질문",
+            "product_description": "답변과 함께 출처와 신뢰도를 확인합니다.",
+            "problems": [],
+        }
+
+    return {
+        "focus": "전체 응답",
+        "kicker": "WHAT WE FOUND",
+        "title": "응답은 두 갈래의 불편으로 모였습니다",
+        "description": "두 집단의 상위 응답을 제품 방향과 연결해 살펴봅니다.",
+        "interpretation": "이동·동행 모집과 신뢰할 수 있는 생활정보 탐색이 함께 필요했습니다.",
+        "tone": "overview",
+        "total": int(model["total"]),
+        "pain_items": [],
+        "find_items": [],
+        "product_asset": None,
+        "product_title": "두 문제를 하나의 흐름으로",
+        "product_description": "파티 모집과 근거 있는 정보 탐색을 함께 연결합니다.",
+        "problems": [
+            {
+                "number": "01",
+                "tone": "movement",
+                "title": "이동과 동행 모집",
+                "description": "같은 시간과 목적지의 사람을 빠르게 찾는 과정이 반복됐습니다.",
+            },
+            {
+                "number": "02",
+                "tone": "information",
+                "title": "공지와 생활정보 탐색",
+                "description": "흩어진 정보의 위치와 최신성, 신뢰도를 다시 확인해야 했습니다.",
+            },
+        ],
+    }
+
+
 def research_page_css() -> str:
     return """
 <style>
