@@ -10,3 +10,4 @@ tmp/
 data/responses/foreign_student_survey.csv
 .agents/
 .codex/
+.worktrees/
