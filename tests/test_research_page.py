@@ -6,6 +6,7 @@ from src.research_page import (
     build_research_view_model,
     focus_panel_html,
     product_bridge_html,
+    research_hero_html,
     research_story_html,
 )
 
@@ -34,8 +35,6 @@ class ResearchPageTest(unittest.TestCase):
             "korean_find": [("택시팟", korean_total)],
             "foreign_pain": [("교통", foreign_total)],
             "foreign_find": [("공지", foreign_total)],
-            "dot_count": min(total, 60),
-            "responses_per_dot": max(1, (total + 59) // 60),
         }
 
     def test_builds_live_summary_without_hard_coded_counts(self) -> None:
@@ -69,32 +68,8 @@ class ResearchPageTest(unittest.TestCase):
         self.assertEqual(result["positive_pct"], "82.9%")
         self.assertEqual(result["korean_pain"], [("버스 노선", 10)])
         self.assertEqual(result["foreign_find"], [("공지", 9)])
-        self.assertEqual(result["dot_count"], 35)
-        self.assertEqual(result["responses_per_dot"], 1)
-
-    def test_caps_respondent_dots_for_large_samples(self) -> None:
-        korean = {
-            "data": {
-                "n": 80,
-                "pain": [],
-                "openchat_find": [],
-                "intent": [],
-            }
-        }
-        foreign = {
-            "data": {
-                "n": 40,
-                "pain": [],
-                "openchat_find": [],
-                "intent": [],
-            }
-        }
-
-        result = build_research_view_model(korean, foreign)
-
-        self.assertEqual(result["total"], 120)
-        self.assertEqual(result["dot_count"], 60)
-        self.assertEqual(result["responses_per_dot"], 2)
+        self.assertNotIn("dot_count", result)
+        self.assertNotIn("responses_per_dot", result)
 
     def test_builds_movement_focus_model(self) -> None:
         model = self.story_model()
@@ -140,15 +115,22 @@ class ResearchPageTest(unittest.TestCase):
         self.assertNotIn("<script>", html)
         self.assertIn("&lt;script&gt;", html)
 
-    def test_story_renders_dynamic_respondent_dots(self) -> None:
+    def test_hero_prioritizes_research_signals_over_respondent_icons(self) -> None:
         model = self.story_model(total=3, korean_total=2, foreign_total=1)
 
-        html = research_story_html(model)
+        html = research_hero_html(model)
 
-        self.assertEqual(html.count('class="respondent-dot '), 3)
+        self.assertNotIn("respondent-dot", html)
+        self.assertNotIn("점 1개는", html)
+        self.assertIn('class="research-signal movement"', html)
+        self.assertIn('class="research-signal information"', html)
+        self.assertIn("버스 노선 2명", html)
+        self.assertIn("택시팟 2명", html)
+        self.assertIn("교통 1명", html)
+        self.assertIn("공지 1명", html)
+        self.assertIn("탐색적 수요조사", html)
         self.assertIn("한국인 2명", html)
         self.assertIn("외국인 1명", html)
-        self.assertNotIn("39명의 응답", html)
 
     def test_story_bars_expose_values_without_hover(self) -> None:
         model = self.story_model(total=3, korean_total=2, foreign_total=1)

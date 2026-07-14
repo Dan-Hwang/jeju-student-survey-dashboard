@@ -25,8 +25,6 @@ def build_research_view_model(
     foreign_positive = _count(foreign["intent"], "긍정")
     positive_total = korean_positive + foreign_positive
     total = korean_total + foreign_total
-    dot_count = min(total, 60)
-    responses_per_dot = max(1, (total + 59) // 60)
 
     return {
         "total": total,
@@ -45,8 +43,6 @@ def build_research_view_model(
         "korean_find": list(korean.get("openchat_find", [])),
         "foreign_pain": list(foreign.get("pain", [])),
         "foreign_find": list(foreign.get("openchat_find", [])),
-        "dot_count": dot_count,
-        "responses_per_dot": responses_per_dot,
     }
 
 
@@ -155,17 +151,6 @@ body {
   position: relative;
   overflow: hidden;
 }
-.story-hero::after {
-  content: "";
-  position: absolute;
-  right: -84px;
-  bottom: -114px;
-  width: 290px;
-  height: 290px;
-  border: 1px solid rgba(255,255,255,.13);
-  border-radius: 50%;
-  pointer-events: none;
-}
 .hero-copy-block {
   position: relative;
   z-index: 1;
@@ -211,48 +196,71 @@ body {
   font-size: 12px;
   font-weight: 800;
 }
-.respondent-visual {
+.signal-board {
   position: relative;
   z-index: 1;
   min-width: 0;
-  padding: 28px;
-  border: 1px solid rgba(255,255,255,.17);
-  border-radius: 8px;
-  background: rgba(255,255,255,.07);
+  border-top: 1px solid rgba(255,255,255,.28);
+  border-bottom: 1px solid rgba(255,255,255,.28);
 }
-.respondent-dots {
+.signal-board-head {
   display: grid;
-  grid-template-columns: repeat(8, minmax(20px, 1fr));
-  gap: clamp(8px, 1.2vw, 12px);
-  align-items: center;
-  justify-items: center;
+  gap: 7px;
+  padding: 0 0 20px;
 }
-.respondent-dot {
-  width: clamp(13px, 1.7vw, 19px);
-  aspect-ratio: 1;
-  border-radius: 50%;
-  opacity: 0;
-  transform: translateY(12px) scale(.65);
-  animation: dotArrive .48s cubic-bezier(.2,.8,.2,1) forwards;
-  animation-delay: calc(var(--dot-index) * 22ms + 120ms);
+.signal-board-head span {
+  color: #72e0d5;
+  font-size: 11px;
+  font-weight: 900;
 }
-.respondent-dot.korean {
-  background: var(--story-coral);
-  box-shadow: 0 0 0 5px rgba(240,93,78,.11);
+.signal-board-head strong {
+  color: #ffffff;
+  font-size: 20px;
+  line-height: 1.45;
+  word-break: keep-all;
 }
-.respondent-dot.foreign {
-  background: #39c9bd;
-  box-shadow: 0 0 0 5px rgba(57,201,189,.11);
+.research-signal {
+  display: grid;
+  grid-template-columns: 94px minmax(0, 1fr);
+  gap: 20px;
+  padding: 22px 0;
+  border-top: 1px solid rgba(255,255,255,.16);
 }
-.dot-scale {
-  margin: 24px 0 0;
-  color: #aebed3;
+.research-signal > span {
+  padding-top: 2px;
+  color: #ff8d82;
   font-size: 12px;
-  font-weight: 800;
-  text-align: center;
+  font-weight: 900;
 }
-@keyframes dotArrive {
-  to { opacity: 1; transform: translateY(0) scale(1); }
+.research-signal.information > span { color: #72e0d5; }
+.signal-facts {
+  display: grid;
+  gap: 11px;
+}
+.signal-fact {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  align-items: baseline;
+}
+.signal-fact small {
+  color: #9fb0c8;
+  font-size: 11px;
+  font-weight: 800;
+}
+.signal-fact strong {
+  color: #ffffff;
+  font-size: 15px;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.signal-limit {
+  margin: 0;
+  padding: 18px 0 0;
+  border-top: 1px solid rgba(255,255,255,.16);
+  color: #aebed3;
+  font-size: 11px;
+  line-height: 1.7;
 }
 .story-problems {
   padding: 0 clamp(4px, 3vw, 28px);
@@ -572,7 +580,7 @@ body {
     min-height: 0;
     grid-template-columns: 1fr;
   }
-  .respondent-visual {
+  .signal-board {
     width: min(100%, 560px);
   }
   .evidence-scene {
@@ -598,12 +606,7 @@ body {
   .story-hero h1 { font-size: 38px; }
   .hero-copy { font-size: 14px; }
   .hero-meta { margin-top: 22px; }
-  .respondent-visual { padding: 22px 16px; }
-  .respondent-dots {
-    grid-template-columns: repeat(8, minmax(16px, 1fr));
-    gap: 9px 6px;
-  }
-  .respondent-dot { width: 13px; }
+  .research-signal { grid-template-columns: 82px minmax(0, 1fr); }
   .story-problems { padding: 0 4px; }
   .story-problems > h2 { font-size: 31px; }
   .problem-paths, .bridge-grid { grid-template-columns: 1fr; }
@@ -645,7 +648,6 @@ body {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .respondent-dot,
   .story-bar-track span {
     animation: none !important;
     opacity: 1;
@@ -657,31 +659,40 @@ body {
 """
 
 
-def _respondent_dots_html(model: dict[str, object]) -> str:
+def _research_signals_html(model: dict[str, object]) -> str:
     total = int(model["total"])
     if total <= 0:
         return '<p class="empty-story">아직 집계된 응답이 없습니다.</p>'
 
-    dot_count = int(model["dot_count"])
     korean_total = int(model["korean_total"])
-    korean_dots = round(dot_count * korean_total / total)
-    dots = []
-    for index in range(dot_count):
-        group = "korean" if index < korean_dots else "foreign"
-        dots.append(
-            f'<span class="respondent-dot {group}" '
-            f'style="--dot-index:{index}" aria-hidden="true"></span>'
-        )
-
-    scale = int(model["responses_per_dot"])
-    scale_note = f"점 1개는 약 {scale}명의 응답" if scale > 1 else "점 1개는 응답 1명"
     foreign_total = int(model["foreign_total"])
-    return (
-        '<div class="respondent-visual" role="img" '
-        f'aria-label="전체 {total}명, 한국인 {korean_total}명, 외국인 {foreign_total}명">'
-        f'<div class="respondent-dots">{"".join(dots)}</div>'
-        f'<p class="dot-scale">{scale_note}</p></div>'
-    )
+    korean_pain, korean_pain_count = model["korean_top_pain"]
+    korean_find, korean_find_count = model["korean_top_find"]
+    foreign_pain, foreign_pain_count = model["foreign_top_pain"]
+    foreign_find, foreign_find_count = model["foreign_top_find"]
+    return f"""
+<aside class="signal-board" aria-label="설문에서 반복된 핵심 신호">
+  <div class="signal-board-head">
+    <span>RESEARCH SIGNALS</span>
+    <strong>표본의 크기보다 반복된 불편의 방향을 봤습니다</strong>
+  </div>
+  <div class="research-signal movement">
+    <span>한국인 {korean_total}명</span>
+    <div class="signal-facts">
+      <div class="signal-fact"><small>불편 1순위</small><strong>{escape(str(korean_pain))} {int(korean_pain_count)}명</strong></div>
+      <div class="signal-fact"><small>오픈채팅 1순위</small><strong>{escape(str(korean_find))} {int(korean_find_count)}명</strong></div>
+    </div>
+  </div>
+  <div class="research-signal information">
+    <span>외국인 {foreign_total}명</span>
+    <div class="signal-facts">
+      <div class="signal-fact"><small>불편 1순위</small><strong>{escape(str(foreign_pain))} {int(foreign_pain_count)}명</strong></div>
+      <div class="signal-fact"><small>오픈채팅 1순위</small><strong>{escape(str(foreign_find))} {int(foreign_find_count)}명</strong></div>
+    </div>
+  </div>
+  <p class="signal-limit">탐색적 수요조사 결과이며, 전체 학생으로 일반화하기보다 제품 방향을 확인하는 근거로 사용합니다.</p>
+</aside>
+"""
 
 
 def _story_bars_html(items: list[tuple[str, int]], total: int, tone: str) -> str:
@@ -710,7 +721,6 @@ def _evidence(label: object, count: object, total: int) -> str:
 
 
 def research_hero_html(model: dict[str, object]) -> str:
-    total = int(model["total"])
     korean_total = int(model["korean_total"])
     foreign_total = int(model["foreign_total"])
     return f"""
@@ -718,7 +728,7 @@ def research_hero_html(model: dict[str, object]) -> str:
 <header class="story-hero">
   <div class="hero-copy-block">
     <p class="eyebrow">JEJU EXCHANGE STUDENT RESEARCH</p>
-    <h1><em>{total}명</em>의 응답이<br>두 가지 문제를 가리켰습니다</h1>
+    <h1>응답이 가리킨<br><em>두 가지 문제</em></h1>
     <p class="hero-copy">한국인과 외국인 교류학생이 제주에서 이동하고, 사람을 만나고, 생활정보를 찾으며 겪은 경험을 조사했습니다.</p>
     <div class="hero-meta">
       <span>한국인 {korean_total}명</span>
@@ -726,7 +736,7 @@ def research_hero_html(model: dict[str, object]) -> str:
       <span>마지막 집계 {escape(str(model['loaded_at']))}</span>
     </div>
   </div>
-  {_respondent_dots_html(model)}
+  {_research_signals_html(model)}
 </header>
 """
 
@@ -788,7 +798,6 @@ def focus_panel_html(focus_model: dict[str, object]) -> str:
 
 
 def research_story_html(model: dict[str, object]) -> str:
-    total = int(model["total"])
     korean_total = int(model["korean_total"])
     foreign_total = int(model["foreign_total"])
 
@@ -798,7 +807,7 @@ def research_story_html(model: dict[str, object]) -> str:
   <header class="story-hero">
     <div class="hero-copy-block">
       <p class="eyebrow">JEJU EXCHANGE STUDENT RESEARCH</p>
-      <h1><em>{total}명</em>의 응답이<br>두 가지 문제를 가리켰습니다</h1>
+      <h1>응답이 가리킨<br><em>두 가지 문제</em></h1>
       <p class="hero-copy">한국인과 외국인 교류학생이 제주에서 이동하고, 사람을 만나고, 생활정보를 찾으며 겪은 경험을 조사했습니다.</p>
       <div class="hero-meta">
         <span>한국인 {korean_total}명</span>
@@ -806,7 +815,7 @@ def research_story_html(model: dict[str, object]) -> str:
         <span>마지막 집계 {escape(str(model['loaded_at']))}</span>
       </div>
     </div>
-    {_respondent_dots_html(model)}
+    {_research_signals_html(model)}
   </header>
 
   <section class="story-problems" aria-labelledby="problem-title">
