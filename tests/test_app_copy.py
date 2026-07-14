@@ -21,7 +21,7 @@ class AppCopyTest(unittest.TestCase):
     def test_app_connects_research_to_synapspot(self) -> None:
         self.assertIn("render_research_intro", self.app_text)
         self.assertIn("product_bridge_html", self.app_text)
-        self.assertIn("상세 조사 결과", self.app_text)
+        self.assertIn("전체 데이터 살펴보기", self.app_text)
         self.assertNotIn("JEJU EXCHANGE SURVEY", self.app_text)
 
     def test_app_renders_product_preview_with_missing_asset_fallback(self) -> None:
@@ -49,6 +49,18 @@ class AppCopyTest(unittest.TestCase):
         self.assertIn("jeju-student-survey-research-preview.streamlit.app", self.app_text)
         self.assertNotIn("def build_current_pdf", self.app_text)
         self.assertNotIn("def draw_pdf_metric", self.app_text)
+
+    def test_presentation_story_precedes_detailed_dashboard(self) -> None:
+        story_index = self.app_text.index("render_research_intro")
+        preview_index = self.app_text.index("render_product_preview")
+        detail_index = self.app_text.index("전체 데이터 살펴보기")
+
+        self.assertLess(story_index, preview_index)
+        self.assertLess(preview_index, detail_index)
+
+    def test_page_style_supports_full_width_presentation(self) -> None:
+        self.assertIn("max-width: 1180px", self.app_text)
+        self.assertIn("scroll-margin-top", self.app_text)
 
 
 if __name__ == "__main__":

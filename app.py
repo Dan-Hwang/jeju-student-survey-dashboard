@@ -44,7 +44,7 @@ html, body, [data-testid="stAppViewContainer"], .stApp {
 }
 
 .main .block-container {
-    max-width: 1120px;
+    max-width: 1180px;
     padding: 1.25rem 1rem 4rem;
 }
 
@@ -55,6 +55,10 @@ html, body, [data-testid="stAppViewContainer"], .stApp {
 
 h1, h2, h3, p {
     letter-spacing: 0;
+}
+
+h1, h2, h3 {
+    scroll-margin-top: 24px;
 }
 
 h1 {
@@ -486,18 +490,18 @@ def render_product_preview() -> None:
     st.caption("수요조사에서 확인한 두 문제와 직접 연결되는 실제 모바일 화면입니다.")
 
     previews = [
-        (QUESTION_PREVIEW, "근거 있는 AI 질문", "답변과 함께 출처와 신뢰도를 확인합니다."),
         (MEETINGS_PREVIEW, "이동·동행 파티", "모임을 찾고 만들고 신청 상태를 관리합니다."),
+        (QUESTION_PREVIEW, "근거 있는 AI 질문", "답변과 함께 출처와 신뢰도를 확인합니다."),
     ]
     columns = st.columns(2)
     for column, (image_path, title, description) in zip(columns, previews):
         with column:
+            st.markdown(f"### {title}")
+            st.caption(description)
             if image_path.exists():
                 st.image(str(image_path), width="stretch")
             else:
                 st.info("미리보기 이미지를 준비 중입니다.")
-            st.markdown(f"### {title}")
-            st.caption(description)
 
 
 def render_data_status(korean_survey: dict[str, object], foreign_survey: dict[str, object]) -> None:
@@ -755,8 +759,8 @@ def render_survey_dashboard() -> None:
     render_research_intro(korean_survey, foreign_survey)
     render_product_preview()
     render_data_status(korean_survey, foreign_survey)
-    st.markdown("## 상세 조사 결과")
-    st.caption("전체 흐름을 먼저 보고, 필요한 집단과 항목을 골라 자세히 확인해보세요.")
+    st.markdown("## 전체 데이터 살펴보기")
+    st.caption("발표 흐름에서 다룬 근거와 전체 응답 항목을 직접 비교할 수 있습니다.")
     selected_view = st.radio(
         "보기 선택",
         ["전체 요약", "한국인 설문", "외국인 설문", "비교 요약"],
