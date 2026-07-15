@@ -1,0 +1,187 @@
+import json
+import os
+import unittest
+from datetime import datetime
+from pathlib import Path
+from tempfile import TemporaryDirectory
+from unittest.mock import patch
+
+from src import survey_dashboard
+from src.survey_dashboard import build_foreign_report_data, collect_comments
+
+
+class SurveyFreshnessTest(unittest.TestCase):
+    def tearDown(self) -> None:
+        survey_dashboard.get_public_survey.clear()
+        survey_dashboard.get_foreign_survey.clear()
+
+    def test_public_csv_fallback_uses_file_modification_time(self) -> None:
+        with TemporaryDirectory() as directory:
+            csv_path = Path(directory) / "korean.csv"
+            csv_path.write_text("자유롭게\n좋은 서비스입니다\n", encoding="utf-8")
+            modified_at = 1_700_000_000
+            os.utime(csv_path, (modified_at, modified_at))
+            missing_credentials = Path(directory) / "missing.json"
+
+            survey_dashboard.get_public_survey.clear()
+            with (
+                patch.object(survey_dashboard, "DEFAULT_CSV", csv_path),
+                patch.object(
+                    survey_dashboard,
+                    "get_credentials_path",
+                    return_value=missing_credentials,
+                ),
+            ):
+                result = survey_dashboard.get_public_survey()
+
+        self.assertEqual(result["source"], "CSV fallback")
+        self.assertEqual(
+            result["loaded_at"],
+            datetime.fromtimestamp(modified_at).strftime("%Y-%m-%d %H:%M"),
+        )
+
+    def test_missing_backing_data_uses_explicit_empty_timestamp(self) -> None:
+        with TemporaryDirectory() as directory:
+            missing = Path(directory) / "missing"
+
+            survey_dashboard.get_public_survey.clear()
+            survey_dashboard.get_foreign_survey.clear()
+            with (
+                patch.object(survey_dashboard, "DEFAULT_CSV", missing),
+                patch.object(survey_dashboard, "DEFAULT_FOREIGN_CSV", missing),
+                patch.object(survey_dashboard, "DEFAULT_FOREIGN_SUMMARY", missing),
+                patch.object(
+                    survey_dashboard,
+                    "get_credentials_path",
+                    return_value=missing,
+                ),
+                patch.object(survey_dashboard, "get_secret_value", return_value=""),
+            ):
+                korean = survey_dashboard.get_public_survey()
+                foreign = survey_dashboard.get_foreign_survey()
+
+        self.assertEqual((korean["source"], korean["loaded_at"]), ("empty", "-"))
+        self.assertEqual((foreign["source"], foreign["loaded_at"]), ("empty", "-"))
+
+    def test_foreign_csv_and_json_fallbacks_use_backing_file_mtime(self) -> None:
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            csv_path = root / "foreign.csv"
+            csv_path.write_text("anything else\nHelpful dashboard\n", encoding="utf-8")
+            json_path = root / "foreign.json"
+            json_path.write_text(
+                json.dumps(
+                    {
+                        "n": 1,
+                        "pain": [],
+                        "taxi_frequency": [],
+                        "activity": [],
+                        "openchat_find": [],
+                        "openchat_pain": [],
+                        "intent": [["긍정", 0], ["중립", 0], ["부정", 0]],
+                        "comments": [],
+                    },
+                    ensure_ascii=False,
+                ),
+                encoding="utf-8",
+            )
+            missing = root / "missing"
+
+            for fallback_path, csv_candidate, json_candidate, expected_source in [
+                (csv_path, csv_path, json_path, "CSV"),
+                (json_path, missing, json_path, "CSV summary"),
+            ]:
+                with self.subTest(source=expected_source):
+                    modified_at = 1_700_000_000 + len(expected_source) * 60
+                    os.utime(fallback_path, (modified_at, modified_at))
+                    survey_dashboard.get_foreign_survey.clear()
+                    with (
+                        patch.object(survey_dashboard, "DEFAULT_FOREIGN_CSV", csv_candidate),
+                        patch.object(survey_dashboard, "DEFAULT_FOREIGN_SUMMARY", json_candidate),
+                        patch.object(
+                            survey_dashboard,
+                            "get_credentials_path",
+                            return_value=missing,
+                        ),
+                        patch.object(survey_dashboard, "get_secret_value", return_value=""),
+                    ):
+                        result = survey_dashboard.get_foreign_survey()
+
+                    self.assertEqual(result["source"], expected_source)
+                    self.assertEqual(
+                        result["loaded_at"],
+                        datetime.fromtimestamp(modified_at).strftime("%Y-%m-%d %H:%M"),
+                    )
+
+
+class PublicCommentPrivacyTest(unittest.TestCase):
+    def test_collect_comments_blocks_identifier_shaped_contact_data(self) -> None:
+        blocked_cases = {
+            "email": "메일은 student@example.com 입니다",
+            "korean_phone": "전화 010-1234-5678",
+            "international_phone": "Call me at +1 415 555 2671",
+            "full_url": "https://example.com/profile 에 남겼어요",
+            "handle": "인스타 @jeju_friend",
+            "korean_kakao_id": "카톡 ID: jeju2026",
+            "plain_kakao_id": "카톡 jeju2026",
+            "korean_contact_value": "연락처: 비밀계정",
+            "english_instagram": "Instagram: jeju_friend",
+            "english_kakao": "Kakao ID: jeju2026",
+            "letter_only_instagram": "Instagram: jejufriend",
+            "letter_only_kakao": "Kakao: jejufriend",
+            "instagram_id_marker": "Instagram ID: jejufriend",
+            "kakao_account_marker": "Kakao account: jejufriend",
+            "instagram_id_spacing": "Instagram ID jejufriend",
+            "kakao_account_spacing": "Kakao account jejufriend",
+            "korean_instagram_id": "인스타: 제주친구",
+            "korean_kakao_letter_id": "카카오톡: 제주친구",
+            "bitly_short_url": "bit.ly/private",
+            "naver_short_url": "naver.me/private",
+        }
+
+        for case, comment in blocked_cases.items():
+            with self.subTest(case=case):
+                self.assertEqual(collect_comments([{"comment": comment}], "comment"), [])
+
+    def test_collect_comments_allows_ordinary_contact_related_feedback(self) -> None:
+        allowed_cases = {
+            "korean_phone_prose": "전화 번호 확인이 어려워요",
+            "korean_instagram_prose": "인스타 계정 찾기 어려워요",
+            "korean_kakao_prose": "카카오톡 검색이 불편해요",
+            "english_instagram_prose": "Instagram account search is difficult.",
+            "english_kakao_prose": "Kakao search needs better filters.",
+            "korean_instagram_colon_prose": "인스타: 검색이 불편해요",
+            "korean_phone_colon_prose": "전화: 번호 확인이 어려워요",
+            "korean_kakao_colon_prose": "카카오톡: 검색 기능이 필요해요",
+            "english_instagram_colon_prose": "Instagram: account search is difficult.",
+            "english_kakao_colon_prose": "Kakao: search needs better filters.",
+            "reserved_everyone": "일반 공지에서 @everyone 태그가 불편해요",
+            "reserved_channel": "Please avoid @channel in announcements.",
+            "reserved_here": "@here mention notifications are noisy.",
+            "ordinary_korean": "버스 노선 정보가 더 정확하면 좋겠어요",
+            "ordinary_english": "It would be easier to find old announcements.",
+            "dotted_prose": "Version 1.2.3 was easier to understand.",
+        }
+
+        for case, comment in allowed_cases.items():
+            with self.subTest(case=case):
+                self.assertEqual(
+                    collect_comments([{"comment": comment}], "comment"),
+                    [comment],
+                )
+
+    def test_foreign_information_accuracy_signal_reaches_report_data(self) -> None:
+        rows = [
+            {
+                "most frustrating": "정보가 정확한지 모르겠다",
+                "anything else": "Normal feedback",
+            }
+        ]
+
+        data = build_foreign_report_data(rows)
+
+        self.assertEqual(data["openchat_pain"], [("정보 정확성 모르겠다", 1)])
+
+
+if __name__ == "__main__":
+    unittest.main()

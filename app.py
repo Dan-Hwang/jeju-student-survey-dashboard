@@ -15,7 +15,25 @@ from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 
+from src.research_brief import (
+    BriefContext,
+    build_brief_context,
+    comparison_html,
+    conclusion_html,
+    findings_html,
+    intro_html,
+    product_bridge_html,
+)
 from src.survey_dashboard import get_foreign_survey, get_public_survey, pct
+
+
+RESEARCH_CSS_PATH = Path(__file__).parent / "assets" / "research-brief.css"
+MEETINGS_PREVIEW = (
+    Path(__file__).parent / "assets" / "synapspot-meetings-preview.png"
+)
+QUESTION_PREVIEW = (
+    Path(__file__).parent / "assets" / "synapspot-question-preview.png"
+)
 
 
 def apply_page_style() -> None:
@@ -23,16 +41,14 @@ def apply_page_style() -> None:
         """
 <style>
 :root {
-    --ara-bg: #f6f8fb;
-    --ara-card: #ffffff;
-    --ara-text: #172033;
-    --ara-muted: #64748b;
-    --ara-line: #dbe4ef;
-    --ara-blue: #2563eb;
-    --ara-teal: #0f766e;
-    --ara-sky: #0ea5e9;
-    --ara-green: #16a34a;
-    --ara-orange: #f97316;
+    --ara-bg: #fbfcfd;
+    --ara-card: #fbfcfd;
+    --ara-text: #13233d;
+    --ara-muted: #66768a;
+    --ara-line: #d8e2e9;
+    --ara-blue: #132e50;
+    --ara-teal: #087f72;
+    --ara-coral: #ec6a5f;
 }
 
 html, body, [data-testid="stAppViewContainer"], .stApp {
@@ -79,16 +95,13 @@ p, li, .stMarkdown, [data-testid="stCaptionContainer"] {
 
 div[data-testid="stVerticalBlockBorderWrapper"] {
     border-color: var(--ara-line);
-    border-radius: 20px;
+    border-radius: 8px;
     background: var(--ara-card);
-    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
 }
 
 div[data-testid="stVerticalBlockBorderWrapper"]:has(h1) {
-    border-color: #bfdbfe;
-    background:
-        linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(20, 184, 166, 0.08)),
-        #ffffff;
+    border-color: var(--ara-line);
+    background: var(--ara-bg);
 }
 
 div[data-testid="stProgress"] {
@@ -96,20 +109,20 @@ div[data-testid="stProgress"] {
 }
 
 div[data-testid="stProgress"] > div > div {
-    background-color: #e7edf4;
+    background-color: var(--ara-line);
 }
 
 div[data-testid="stProgress"] > div > div > div {
-    background: linear-gradient(90deg, var(--ara-blue), var(--ara-teal));
+    background: var(--ara-teal);
 }
 
 .stButton > button,
 div.stDownloadButton > button {
     width: 100%;
     min-height: 2.8rem;
-    border-radius: 12px;
-    border: 1px solid #cbd5e1;
-    background: #ffffff;
+    border-radius: 8px;
+    border: 1px solid var(--ara-line);
+    background: var(--ara-bg);
     color: var(--ara-text);
     font-weight: 700;
 }
@@ -123,13 +136,22 @@ section[data-testid="stSidebar"] {
     display: none;
 }
 
+div[role="radiogroup"] {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+div[role="radiogroup"] label {
+    min-width: max-content;
+}
+
 .field-counter {
     overflow: hidden;
     margin: 1rem 0 0.75rem;
     border: 1px solid var(--ara-line);
     border-radius: 8px;
     background: var(--ara-card);
-    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
 }
 
 .field-total {
@@ -138,13 +160,13 @@ section[data-testid="stSidebar"] {
     justify-content: space-between;
     gap: 1rem;
     padding: 1.25rem 1.4rem;
-    color: #ffffff;
-    background: #172f57;
+    color: var(--ara-bg);
+    background: var(--ara-bridge, #132e50);
 }
 
 .field-label {
     margin-bottom: 0.25rem;
-    color: #cbdcf6;
+    color: var(--ara-line);
     font-size: 0.82rem;
     font-weight: 700;
 }
@@ -156,7 +178,7 @@ section[data-testid="stSidebar"] {
 }
 
 .field-live {
-    color: #d6fff5;
+    color: var(--ara-bg);
     font-size: 0.82rem;
     font-weight: 700;
     text-align: right;
@@ -207,8 +229,10 @@ section[data-testid="stSidebar"] {
     }
 }
 
-.main .block-container > div {
-    animation: araFadeUp 0.35s ease-out both;
+@media (prefers-reduced-motion: no-preference) {
+    .main .block-container > div {
+        animation: araFadeUp 0.35s ease-out both;
+    }
 }
 
 @media (max-width: 640px) {
@@ -217,8 +241,7 @@ section[data-testid="stSidebar"] {
     }
 
     div[data-testid="stVerticalBlockBorderWrapper"] {
-        border-radius: 16px;
-        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.045);
+        border-radius: 8px;
     }
 
     h1 {
@@ -265,6 +288,10 @@ section[data-testid="stSidebar"] {
         """,
         unsafe_allow_html=True,
     )
+    st.markdown(
+        f"<style>{RESEARCH_CSS_PATH.read_text(encoding='utf-8')}</style>",
+        unsafe_allow_html=True,
+    )
 
 
 def source_label(source: str) -> str:
@@ -290,6 +317,15 @@ def render_html(html: str, height: int) -> None:
 def chart_theme() -> str:
     return """
 <style>
+:root {
+    --chart-navy: #13233d;
+    --chart-teal: #087f72;
+    --chart-coral: #ec6a5f;
+    --chart-bg: #fbfcfd;
+    --chart-line: #d8e2e9;
+    --chart-muted: #66768a;
+    --chart-bridge: #132e50;
+}
 * {
     box-sizing: border-box;
 }
@@ -297,24 +333,21 @@ def chart_theme() -> str:
 body {
     margin: 0;
     padding: 0;
-    color: #172033;
+    color: var(--chart-navy);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     background: transparent;
 }
 
 .chart-card {
     width: 100%;
-    border: 1px solid #dbe4ef;
-    border-radius: 20px;
-    background:
-        linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,252,0.96)),
-        #ffffff;
-    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.055);
+    border: 1px solid var(--chart-line);
+    border-radius: 8px;
+    background: var(--chart-bg);
     padding: clamp(16px, 4vw, 24px);
 }
 
 .chart-kicker {
-    color: #64748b;
+    color: var(--chart-muted);
     font-size: 12px;
     font-weight: 800;
     letter-spacing: 0;
@@ -329,10 +362,10 @@ body {
 
 .summary-card {
     min-height: 126px;
-    border-radius: 18px;
+    border-radius: 8px;
     padding: 16px;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
+    background: var(--chart-bg);
+    border: 1px solid var(--chart-line);
     position: relative;
     overflow: hidden;
 }
@@ -344,18 +377,18 @@ body {
     top: 0;
     width: 5px;
     height: 100%;
-    background: linear-gradient(180deg, #2563eb, #0f766e);
+    background: var(--chart-teal);
 }
 
 .summary-label {
-    color: #64748b;
+    color: var(--chart-muted);
     font-size: 12px;
     font-weight: 800;
 }
 
 .summary-value {
     margin-top: 10px;
-    color: #172033;
+    color: var(--chart-navy);
     font-size: clamp(23px, 6vw, 33px);
     line-height: 1.1;
     font-weight: 900;
@@ -364,7 +397,7 @@ body {
 
 .summary-note {
     margin-top: 8px;
-    color: #0f766e;
+    color: var(--chart-teal);
     font-size: 12px;
     font-weight: 800;
 }
@@ -390,19 +423,19 @@ body {
 .bar-track {
     height: 16px;
     overflow: hidden;
-    border-radius: 999px;
-    background: #e8eef5;
+    border-radius: 3px;
+    background: var(--chart-line);
 }
 
 .bar-fill {
     height: 100%;
     min-width: 9px;
-    border-radius: 999px;
-    background: linear-gradient(90deg, #2563eb, #0f766e);
+    border-radius: 3px;
+    background: var(--chart-teal);
 }
 
 .bar-value {
-    color: #475569;
+    color: var(--chart-muted);
     font-size: 13px;
     font-weight: 800;
     text-align: right;
@@ -411,35 +444,34 @@ body {
 
 .intent-layout {
     display: grid;
-    grid-template-columns: 180px 1fr;
-    gap: 22px;
-    align-items: center;
+    gap: 18px;
 }
 
-.donut {
-    width: 168px;
-    aspect-ratio: 1;
-    border-radius: 50%;
-    background: conic-gradient(
-        #2563eb 0 var(--positive),
-        #f59e0b var(--positive) var(--neutral),
-        #ef4444 var(--neutral) 100%
-    );
-    position: relative;
-    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.05);
+.intent-bar {
+    display: flex;
+    overflow: hidden;
+    width: 100%;
+    height: 18px;
+    border: 1px solid var(--chart-line);
+    border-radius: 3px;
+    background: var(--chart-line);
 }
 
-.donut::after {
-    content: attr(data-total);
-    position: absolute;
-    inset: 34px;
-    display: grid;
-    place-items: center;
-    border-radius: 50%;
-    background: #ffffff;
-    color: #172033;
-    font-size: 24px;
-    font-weight: 900;
+.intent-segment {
+    display: block;
+    height: 100%;
+}
+
+.intent-segment.positive, .dot.positive {
+    background: var(--chart-teal);
+}
+
+.intent-segment.neutral, .dot.neutral {
+    background: var(--chart-muted);
+}
+
+.intent-segment.negative, .dot.negative {
+    background: var(--chart-coral);
 }
 
 .legend {
@@ -465,7 +497,7 @@ body {
 }
 
 .legend-value {
-    color: #475569;
+    color: var(--chart-muted);
     font-size: 13px;
     font-weight: 800;
     white-space: nowrap;
@@ -490,14 +522,6 @@ body {
         text-align: left;
     }
 
-    .intent-layout {
-        grid-template-columns: 1fr;
-    }
-
-    .donut {
-        width: min(180px, 58vw);
-        margin: 0 auto;
-    }
 }
 </style>
 """
@@ -566,28 +590,33 @@ def intent_chart_html(intent: list[tuple[str, int]], total: int) -> str:
     positive = values.get("긍정", 0)
     neutral = values.get("중립", 0)
     negative = values.get("부정", 0)
-    positive_end = positive / total * 100 if total else 0
-    neutral_end = (positive + neutral) / total * 100 if total else 0
     legend = [
-        ("긍정", positive, "#2563eb"),
-        ("중립", neutral, "#f59e0b"),
-        ("부정", negative, "#ef4444"),
+        ("긍정", positive, "positive"),
+        ("중립", neutral, "neutral"),
+        ("부정", negative, "negative"),
     ]
+    segments = []
+    for label, value, accent in legend:
+        width = max(0.0, min(100.0, value / total * 100)) if total > 0 else 0.0
+        segments.append(
+            f'<span class="intent-segment {accent}" style="width:{width:.1f}%" '
+            f'aria-label="{escape(label)} {value}명 {pct(value, total)}"></span>'
+        )
     legend_markup = "\n".join(
         f"""
 <div class="legend-row">
-    <span class="dot" style="background:{color}"></span>
+    <span class="dot {accent}"></span>
     <span class="legend-label">{escape(label)}</span>
     <span class="legend-value">{value}명 · {pct(value, total)}</span>
 </div>
 """
-        for label, value, color in legend
+        for label, value, accent in legend
     )
     return f"""
 {chart_theme()}
 <section class="chart-card">
     <div class="intent-layout">
-        <div class="donut" data-total="{positive}명 긍정" style="--positive:{positive_end}%; --neutral:{neutral_end}%;"></div>
+        <div class="intent-bar">{''.join(segments)}</div>
         <div class="legend">{legend_markup}</div>
     </div>
 </section>
@@ -628,17 +657,31 @@ def field_counter_html(korean_survey: dict[str, object], foreign_survey: dict[st
 """
 
 
-def render_header(korean_survey: dict[str, object], foreign_survey: dict[str, object]) -> None:
-    st.caption("JEJU EXCHANGE SURVEY")
-    st.title("교류학생 생활 플랫폼 수요조사")
-    st.write("한국인·외국인 학생의 이동, 동행 모집, 오픈채팅 이용 수요를 확인합니다.")
-    st.markdown(field_counter_html(korean_survey, foreign_survey), unsafe_allow_html=True)
+def render_header(
+    korean_survey: dict[str, object], foreign_survey: dict[str, object]
+) -> BriefContext:
+    context = build_brief_context(korean_survey, foreign_survey)
+    st.markdown(intro_html(context), unsafe_allow_html=True)
     if korean_survey.get("error"):
-        st.warning(f"{korean_survey['error']}로 인해 한국인 설문은 저장된 CSV 기준 결과를 표시합니다.")
-    elif korean_survey.get("source") != "Google Sheets":
-        st.warning("Google Sheets 연결 전까지 저장된 CSV 기준 결과를 표시합니다.")
+        st.warning(str(korean_survey["error"]))
     if foreign_survey.get("error"):
         st.warning(str(foreign_survey["error"]))
+    return context
+
+
+def render_research_findings(context: BriefContext) -> None:
+    st.markdown(findings_html(context), unsafe_allow_html=True)
+    st.markdown(comparison_html(context), unsafe_allow_html=True)
+
+
+def render_conclusion(context: BriefContext) -> None:
+    st.markdown(conclusion_html(context), unsafe_allow_html=True)
+
+
+def render_product_bridge(context: BriefContext) -> None:
+    markup = product_bridge_html(context, MEETINGS_PREVIEW, QUESTION_PREVIEW)
+    if markup:
+        st.markdown(markup, unsafe_allow_html=True)
 
 
 def render_summary(data: dict[str, object], total: int) -> None:
@@ -758,11 +801,11 @@ PDF_FONT_CANDIDATES = [
     Path("/usr/share/fonts/truetype/nanum/NanumGothic.ttf"),
     Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
 ]
-PDF_TEXT = colors.HexColor("#172033")
-PDF_MUTED = colors.HexColor("#64748B")
-PDF_LINE = colors.HexColor("#D8E2EE")
-PDF_BLUE = colors.HexColor("#2563EB")
-PDF_TEAL = colors.HexColor("#0F766E")
+PDF_TEXT = colors.HexColor("#13233D")
+PDF_MUTED = colors.HexColor("#66768A")
+PDF_LINE = colors.HexColor("#D8E2E9")
+PDF_BLUE = colors.HexColor("#EC6A5F")
+PDF_TEAL = colors.HexColor("#087F72")
 
 
 def register_pdf_font() -> str:
@@ -922,14 +965,20 @@ def draw_survey_pdf_page(c: canvas.Canvas, title: str, data: dict[str, Any], sou
 
 def build_current_pdf(korean_survey: dict[str, Any], foreign_survey: dict[str, Any]) -> bytes:
     font_name = register_pdf_font()
-    buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
-
     korean = korean_survey["data"]
     foreign = foreign_survey["data"]
-    generated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
     korean_total = int(korean["n"])
     foreign_total = int(foreign["n"])
+
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    c.setTitle("Jeju Exchange Student Survey Research Brief")
+    c.setSubject(
+        f"total={korean_total + foreign_total}; korean={korean_total}; foreign={foreign_total}; "
+        f"korean_source={korean_survey.get('source', '')}; foreign_source={foreign_survey.get('source', '')}"
+    )
+
+    generated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
     korean_top = korean["openchat_find"][0] if korean["openchat_find"] else ("-", 0)
     foreign_top = foreign["openchat_find"][0] if foreign["openchat_find"] else ("-", 0)
 
@@ -946,7 +995,7 @@ def build_current_pdf(korean_survey: dict[str, Any], foreign_survey: dict[str, A
     y = draw_pdf_section(c, "한눈에 보는 결론", y, font_name)
     draw_wrapped_text(
         c,
-        f"한국인 설문은 {korean_top[0]}, 외국인 설문은 {foreign_top[0]} 수요가 두드러집니다. "
+        "이동·동행 모집과 신뢰할 수 있는 생활정보 탐색이 함께 필요했습니다. "
         "PDF는 다운로드 시점의 앱 집계 데이터를 기준으로 생성되며, 개인 식별 정보와 원본 응답 행은 포함하지 않습니다.",
         42,
         y,
@@ -1060,8 +1109,6 @@ def render_overall_view(korean_survey: dict[str, object], foreign_survey: dict[s
     foreign = foreign_survey["data"]
     korean_total = int(korean["n"])
     foreign_total = int(foreign["n"])
-    korean_top_pain = korean["pain"][0] if korean["pain"] else ("-", 0)
-    foreign_top_pain = foreign["pain"][0] if foreign["pain"] else ("-", 0)
     korean_top_openchat = korean["openchat_find"][0] if korean["openchat_find"] else ("-", 0)
     foreign_top_openchat = foreign["openchat_find"][0] if foreign["openchat_find"] else ("-", 0)
 
@@ -1074,21 +1121,38 @@ def render_overall_view(korean_survey: dict[str, object], foreign_survey: dict[s
     ]
     render_html(simple_cards_html(cards), 290)
 
-    with st.container(border=True):
-        st.markdown("### 한눈에 보는 결론")
-        st.write(
-            f"한국인 응답에서는 **{korean_top_pain[0]}**, 외국인 응답에서는 **{foreign_top_pain[0]}** 문제가 크게 보입니다. "
-            f"오픈채팅에서는 한국인 학생은 **{korean_top_openchat[0]}**, 외국인 학생은 **{foreign_top_openchat[0]}**을 많이 찾고 있어요. "
-            "따라서 첫 서비스 검증은 실시간 이동/동행 모집을 중심으로 두고, 외국인 학생에게는 공지/생활정보 탐색을 함께 보강하는 방향이 좋습니다."
-        )
+    st.markdown("### 한국인 응답 상세")
+    render_rank_section(
+        "한국인 핵심 불편",
+        "한국인 응답 기준",
+        korean["pain"],
+        korean_total,
+    )
+    render_rank_section(
+        "한국인 오픈채팅 수요",
+        "한국인 응답 기준",
+        korean["openchat_find"],
+        korean_total,
+    )
 
-    render_rank_section("전체 핵심 불편", "한국인/외국인 1순위 비교", [("한국인: " + str(korean_top_pain[0]), korean_top_pain[1]), ("외국인: " + str(foreign_top_pain[0]), foreign_top_pain[1])], max(korean_total, foreign_total))
-    render_rank_section("전체 오픈채팅 수요", "한국인/외국인 1순위 비교", [("한국인: " + str(korean_top_openchat[0]), korean_top_openchat[1]), ("외국인: " + str(foreign_top_openchat[0]), foreign_top_openchat[1])], max(korean_total, foreign_total))
+    st.markdown("### 외국인 응답 상세")
+    render_rank_section(
+        "외국인 핵심 불편",
+        "외국인 응답 기준",
+        foreign["pain"],
+        foreign_total,
+    )
+    render_rank_section(
+        "외국인 오픈채팅 수요",
+        "외국인 응답 기준",
+        foreign["openchat_find"],
+        foreign_total,
+    )
 
 
 def render_survey_dashboard() -> None:
     st.set_page_config(
-        page_title="제주대학교 교류학생 생활 플랫폼 수요조사",
+        page_title="교류학생의 이동과 정보 탐색",
         page_icon="📊",
         layout="centered",
     )
@@ -1097,10 +1161,15 @@ def render_survey_dashboard() -> None:
     korean_survey = get_public_survey()
     foreign_survey = get_foreign_survey()
 
-    render_header(korean_survey, foreign_survey)
+    context = render_header(korean_survey, foreign_survey)
     if st.button("데이터 새로고침", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
+
+    render_conclusion(context)
+    render_research_findings(context)
+    render_product_bridge(context)
+    st.markdown("## 상세 조사 결과")
     selected_view = st.radio(
         "보기 선택",
         ["전체 요약", "한국인 설문", "외국인 설문", "비교 요약"],
