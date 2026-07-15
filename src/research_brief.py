@@ -46,6 +46,28 @@ SOURCE_NAMES = {
     "empty": "데이터 없음",
 }
 
+MOVEMENT_LABELS = {
+    "교통",
+    "버스 노선",
+    "택시비",
+    "같이 이동할 사람 찾기",
+    "여행 계획",
+    "택시팟",
+    "여행팟",
+}
+INFORMATION_LABELS = {
+    "정보 부족",
+    "공지",
+    "생활정보",
+    "시험정보",
+    "원하는 글 찾기 어렵다",
+    "글이 너무 많다",
+    "지난 글 찾기 어렵다",
+    "검색 기능 불편",
+    "정보 정확성 모르겠다",
+    "채팅이 빨리 올라간다",
+}
+
 
 def percent_text(value: int, total: int) -> str:
     if total <= 0:
@@ -85,34 +107,58 @@ def build_brief_context(
     korean_source = str(korean_survey.get("source", "empty"))
     foreign_source = str(foreign_survey.get("source", "empty"))
     is_live = korean_source == "Google Sheets" and foreign_source == "Google Sheets"
-    loaded_at = max(
-        str(korean_survey.get("loaded_at", "-")),
-        str(foreign_survey.get("loaded_at", "-")),
-    )
+    total = korean.total + foreign.total
+    timestamps = [
+        timestamp
+        for timestamp in (
+            str(korean_survey.get("loaded_at", "-")),
+            str(foreign_survey.get("loaded_at", "-")),
+        )
+        if timestamp not in {"", "-"}
+    ]
+    if total == 0:
+        status = "응답 수집 대기"
+    elif korean.total == 0 or foreign.total == 0:
+        status = "일부 설문만 집계"
+    elif is_live:
+        status = "Google Sheets 실시간 집계"
+    elif "Google Sheets" in {korean_source, foreign_source}:
+        status = "일부 실시간 · 혼합 집계"
+    else:
+        status = "저장 데이터 기준 집계"
     return BriefContext(
-        total=korean.total + foreign.total,
+        total=total,
         korean=korean,
         foreign=foreign,
-        status="Google Sheets 실시간 집계" if is_live else "저장 데이터 포함 집계",
+        status=status,
         source_detail=(
             f"한국인 {SOURCE_NAMES.get(korean_source, korean_source)} · "
             f"외국인 {SOURCE_NAMES.get(foreign_source, foreign_source)}"
         ),
-        loaded_at=loaded_at,
+        loaded_at=max(timestamps) if timestamps else "-",
         is_live=is_live,
-        has_data=(korean.total + foreign.total) > 0,
+        has_data=total > 0,
     )
 
 
-def _metric_rows(metrics: tuple[RankedMetric, ...], accent: str) -> str:
-    if not metrics:
+def _problem_rows(
+    groups: tuple[tuple[GroupBrief, str], ...], labels: set[str]
+) -> str:
+    selected: list[tuple[str, RankedMetric, str]] = []
+    for group, accent in groups:
+        seen: set[str] = set()
+        for metric in (*group.pain, *group.openchat_find, *group.openchat_pain):
+            if metric.label in labels and metric.label not in seen:
+                selected.append((group.label, metric, accent))
+                seen.add(metric.label)
+    if not selected:
         return '<p class="research-empty">아직 표시할 응답이 없습니다.</p>'
     rows = []
-    for metric in metrics:
+    for group_label, metric, accent in selected:
         width = min(100.0, float(metric.percent.rstrip("%") or 0))
         rows.append(
             f'''<div class="research-bar-row">
-  <span class="research-bar-label">{escape(metric.label)}</span>
+  <span class="research-bar-label">{escape(group_label)} · {escape(metric.label)}</span>
   <span class="research-bar-track"><span class="research-bar-fill {accent}" style="width:{width:.1f}%"></span></span>
   <strong>{metric.count}명 <small>{metric.percent}</small></strong>
 </div>'''
@@ -121,12 +167,6 @@ def _metric_rows(metrics: tuple[RankedMetric, ...], accent: str) -> str:
 
 
 def intro_html(context: BriefContext) -> str:
-    conclusion = (
-        '<div class="research-conclusion">이동·동행 모집과 신뢰할 수 있는 '
-        "생활정보 탐색이 함께 필요했습니다.</div>"
-        if context.has_data
-        else '<div class="research-conclusion is-empty">응답을 수집하고 있습니다.</div>'
-    )
     return f'''<section class="research-hero">
   <p class="research-kicker">JEJU EXCHANGE STUDENT RESEARCH</p>
   <h1>교류학생의 이동과 정보 탐색은 어디서 막혔을까?</h1>
@@ -138,28 +178,45 @@ def intro_html(context: BriefContext) -> str:
     <div><span>데이터 상태</span><strong class="is-status">{escape(context.status)}</strong></div>
   </div>
   <p class="research-source">{escape(context.source_detail)} · 마지막 갱신 {escape(context.loaded_at)}</p>
-</section>
-<section class="research-section"> <h2>먼저 볼 결론</h2>{conclusion}</section>'''
+</section>'''
+
+
+def conclusion_html(context: BriefContext) -> str:
+    conclusion = (
+        '<div class="research-conclusion">이동·동행 모집과 신뢰할 수 있는 '
+        "생활정보 탐색이 함께 필요했습니다.</div>"
+        if context.has_data
+        else '<div class="research-conclusion is-empty">응답을 수집하고 있습니다.</div>'
+    )
+    return f'''<section class="research-section"><h2>먼저 볼 결론</h2>{conclusion}</section>'''
 
 
 def findings_html(context: BriefContext) -> str:
+    groups = ((context.korean, "korean"), (context.foreign, "foreign"))
     return f'''<section class="research-section">
   <div class="research-heading"><h2>응답이 가리킨 두 가지 문제</h2><span>복수 응답 · 집단 내 비율</span></div>
   <div class="research-two-column">
-    <article class="research-signal korean"><p>PROBLEM 01 · 한국인 이동 경험</p><h3>이동과 동행 모집</h3>{_metric_rows(context.korean.pain, "korean")}{_metric_rows(context.korean.openchat_find, "korean")}</article>
-    <article class="research-signal foreign"><p>PROBLEM 02 · 외국인 정보 경험</p><h3>공지와 생활정보 탐색</h3>{_metric_rows(context.foreign.pain, "foreign")}{_metric_rows(context.foreign.openchat_find, "foreign")}</article>
+    <article class="research-signal korean"><p>PROBLEM 01 · 두 집단의 이동 경험</p><h3>이동과 동행 모집</h3>{_problem_rows(groups, MOVEMENT_LABELS)}</article>
+    <article class="research-signal foreign"><p>PROBLEM 02 · 두 집단의 정보 경험</p><h3>공지와 생활정보 탐색</h3>{_problem_rows(groups, INFORMATION_LABELS)}</article>
   </div>
 </section>'''
 
 
 def comparison_html(context: BriefContext) -> str:
-    korean_top = context.korean.openchat_find[0].label if context.korean.openchat_find else "응답 수집 중"
-    foreign_top = context.foreign.openchat_find[0].label if context.foreign.openchat_find else "응답 수집 중"
+    def top_markup(group: GroupBrief) -> str:
+        if not group.openchat_find:
+            return "<strong>응답 수집 중</strong>"
+        metric = group.openchat_find[0]
+        return (
+            f"<strong>{escape(metric.label)}</strong>"
+            f"<small>{metric.count}명 · {metric.percent}</small>"
+        )
+
     return f'''<section class="research-section">
   <div class="research-heading"><h2>한국인과 외국인의 경험은 어떻게 달랐나</h2><span>집단별 분모를 따로 계산</span></div>
   <div class="research-compare">
-    <div><span>한국인 · n={context.korean.total}</span><strong>{escape(korean_top)}</strong></div>
-    <div><span>외국인 · n={context.foreign.total}</span><strong>{escape(foreign_top)}</strong></div>
+    <div><span>한국인 · n={context.korean.total}</span>{top_markup(context.korean)}</div>
+    <div><span>외국인 · n={context.foreign.total}</span>{top_markup(context.foreign)}</div>
   </div>
   <p class="research-interpretation">두 집단 모두 사람과 정보를 제때 찾기 어렵다는 공통 문제를 보였습니다.</p>
 </section>'''

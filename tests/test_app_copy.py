@@ -1,8 +1,11 @@
 import ast
+import re
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from app import field_counter_html
+import app
+from app import field_counter_html, intent_chart_html
 
 
 def call_name(call: ast.Call) -> str:
@@ -71,6 +74,8 @@ class AppCopyTest(unittest.TestCase):
                 }.issubset(names)
             ):
                 milestones.append("refresh")
+            if "render_conclusion" in names:
+                milestones.append("render_conclusion")
             if "render_research_findings" in names:
                 milestones.append("render_research_findings")
             if "render_product_bridge" in names:
@@ -89,6 +94,7 @@ class AppCopyTest(unittest.TestCase):
             [
                 "render_header",
                 "refresh",
+                "render_conclusion",
                 "render_research_findings",
                 "render_product_bridge",
                 "detailed_heading",
@@ -98,6 +104,73 @@ class AppCopyTest(unittest.TestCase):
             ],
         )
 
+    def test_embedded_css_uses_complete_visual_contract(self) -> None:
+        approved_colors = {
+            "#13233D",
+            "#087F72",
+            "#EC6A5F",
+            "#FBFCFD",
+            "#D8E2E9",
+            "#66768A",
+            "#132E50",
+        }
+        css_functions = [self.functions["apply_page_style"], self.functions["chart_theme"]]
+        embedded_css = "\n".join(
+            str(node.value)
+            for function in css_functions
+            for node in ast.walk(function)
+            if isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and "<style>" in node.value
+        )
+        literal_colors = {
+            match.group(0).upper()
+            for match in re.finditer(
+                r"#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|"
+                r"[0-9a-fA-F]{4}|[0-9a-fA-F]{3})(?![0-9a-fA-F])",
+                embedded_css,
+            )
+        }
+
+        self.assertTrue(embedded_css)
+        self.assertLessEqual(literal_colors, approved_colors)
+        self.assertNotRegex(embedded_css, r"(?i)linear-gradient\s*\(")
+        self.assertNotRegex(embedded_css, r"(?i)rgba\s*\(")
+
+        for rule in re.finditer(r"(?P<selectors>[^{}]+)\{(?P<body>[^{}]*)\}", embedded_css):
+            selectors = {item.strip() for item in rule.group("selectors").split(",")}
+            for radius in re.findall(
+                r"border-radius\s*:\s*([^;{}]+)", rule.group("body"), re.IGNORECASE
+            ):
+                value = radius.strip().lower()
+                if value == "50%":
+                    self.assertLessEqual(selectors, {".donut", ".donut::after", ".dot"})
+                else:
+                    match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)px", value)
+                    self.assertIsNotNone(match, f"unsupported radius {value!r} in {selectors}")
+                    self.assertLessEqual(float(match.group(1)), 8)
+
+    def test_rendered_chart_inline_styles_use_approved_colors(self) -> None:
+        markup = intent_chart_html(
+            [("긍정", 2), ("중립", 1), ("부정", 1)],
+            4,
+        )
+        approved_colors = {
+            "#132E50",
+            "#13233D",
+            "#FBFCFD",
+            "#66768A",
+            "#EC6A5F",
+            "#087F72",
+            "#D8E2E9",
+        }
+        literal_colors = {
+            match.group(0).upper()
+            for match in re.finditer(r"#[0-9a-fA-F]{6}", markup)
+        }
+
+        self.assertLessEqual(literal_colors, approved_colors)
+
     def test_dashboard_renders_product_bridge_exactly_once(self) -> None:
         bridge_calls = [
             node
@@ -106,6 +179,46 @@ class AppCopyTest(unittest.TestCase):
         ]
 
         self.assertEqual(len(bridge_calls), 1)
+
+    def test_dashboard_runtime_places_refresh_before_conclusion_and_findings(self) -> None:
+        events: list[str] = []
+        context = object()
+        survey = {"data": {"n": 0}, "source": "empty", "loaded_at": "-"}
+
+        with (
+            patch.object(app, "apply_page_style"),
+            patch.object(app, "get_public_survey", return_value=survey),
+            patch.object(app, "get_foreign_survey", return_value=survey),
+            patch.object(
+                app,
+                "render_header",
+                side_effect=lambda *_: events.append("header") or context,
+            ),
+            patch.object(
+                app.st,
+                "button",
+                side_effect=lambda *_args, **_kwargs: events.append("refresh") or False,
+            ),
+            patch.object(
+                app,
+                "render_conclusion",
+                side_effect=lambda *_: events.append("conclusion"),
+            ),
+            patch.object(
+                app,
+                "render_research_findings",
+                side_effect=lambda *_: events.append("findings"),
+            ),
+            patch.object(app, "render_product_bridge"),
+            patch.object(app.st, "radio", return_value="전체 요약"),
+            patch.object(app, "render_overall_view"),
+            patch.object(app, "render_downloads"),
+            patch.object(app.st, "set_page_config"),
+            patch.object(app.st, "markdown"),
+        ):
+            app.render_survey_dashboard()
+
+        self.assertEqual(events, ["header", "refresh", "conclusion", "findings"])
 
     def test_presentation_gimmicks_are_not_present(self) -> None:
         hidden_terms = [

@@ -7,6 +7,7 @@ from tempfile import TemporaryDirectory
 from src.research_brief import (
     build_brief_context,
     comparison_html,
+    conclusion_html,
     findings_html,
     image_data_uri,
     intro_html,
@@ -59,14 +60,33 @@ class ResearchBriefContextTest(unittest.TestCase):
         self.assertEqual(korean[0].percent, "47.8%")
         self.assertEqual(foreign[0].percent, "68.8%")
 
-    def test_any_fallback_source_disables_live_status(self):
+    def test_mixed_sources_have_partial_status(self):
         korean = survey(11, source="CSV fallback", loaded_at="2026-07-15 14:00")
         foreign = survey(16, source="Google Sheets", loaded_at="2026-07-15 15:00")
 
         context = build_brief_context(korean, foreign)
 
         self.assertFalse(context.is_live)
-        self.assertEqual(context.status, "저장 데이터 포함 집계")
+        self.assertEqual(context.status, "일부 실시간 · 혼합 집계")
+
+    def test_saved_sources_have_fallback_status(self):
+        korean = survey(11, source="CSV fallback", loaded_at="2026-07-15 14:00")
+        foreign = survey(8, source="CSV summary", loaded_at="2026-07-14 12:00")
+
+        context = build_brief_context(korean, foreign)
+
+        self.assertEqual(context.status, "저장 데이터 기준 집계")
+        self.assertEqual(context.loaded_at, "2026-07-15 14:00")
+
+    def test_both_empty_sources_show_waiting_state_and_no_timestamp(self):
+        korean = survey(0, source="empty", loaded_at="-")
+        foreign = survey(0, source="empty", loaded_at="-")
+
+        context = build_brief_context(korean, foreign)
+
+        self.assertEqual(context.status, "응답 수집 대기")
+        self.assertEqual(context.loaded_at, "-")
+        self.assertNotIn("저장 데이터", context.status)
 
     def test_zero_total_returns_zero_percent(self):
         metrics = ranked_metrics([("교통", 0)], 0)
@@ -100,6 +120,13 @@ class ResearchBriefHtmlTest(unittest.TestCase):
         self.assertIn("3명", markup)
         self.assertNotIn("39명", markup)
         self.assertIn('class="research-hero"', markup)
+        self.assertNotIn("먼저 볼 결론", markup)
+
+    def test_conclusion_is_separate_from_header_for_refresh_order(self):
+        markup = conclusion_html(self.context)
+
+        self.assertIn("먼저 볼 결론", markup)
+        self.assertIn("이동·동행 모집", markup)
 
     def test_findings_show_counts_and_group_percentages(self):
         markup = findings_html(self.context)
@@ -108,6 +135,66 @@ class ResearchBriefHtmlTest(unittest.TestCase):
         self.assertIn("75.0%", markup)
         self.assertIn("교통", markup)
         self.assertIn("66.7%", markup)
+
+    def test_findings_group_metrics_by_problem_across_both_populations(self):
+        korean = survey(
+            10,
+            source="Google Sheets",
+            loaded_at="2026-07-15 15:00",
+            pain=[("버스 노선", 9), ("정보 부족", 1)],
+            openchat_find=[("택시팟", 8), ("공지", 2)],
+            openchat_pain=[("원하는 글 찾기 어렵다", 3)],
+        )
+        foreign = survey(
+            4,
+            source="Google Sheets",
+            loaded_at="2026-07-15 15:01",
+            pain=[("정보 부족", 4), ("교통", 2)],
+            openchat_find=[("생활정보", 3), ("여행팟", 1)],
+            openchat_pain=[("검색 기능 불편", 2)],
+        )
+
+        markup = findings_html(build_brief_context(korean, foreign))
+        movement = markup.split("이동과 동행 모집", 1)[1].split("공지와 생활정보 탐색", 1)[0]
+        information = markup.split("공지와 생활정보 탐색", 1)[1]
+
+        for expected in ["한국인", "외국인", "버스 노선", "교통", "택시팟", "여행팟"]:
+            self.assertIn(expected, movement)
+        for excluded in ["정보 부족", "공지", "생활정보", "검색 기능 불편"]:
+            self.assertNotIn(excluded, movement)
+        for expected in [
+            "한국인",
+            "외국인",
+            "정보 부족",
+            "공지",
+            "생활정보",
+            "원하는 글 찾기 어렵다",
+            "검색 기능 불편",
+        ]:
+            self.assertIn(expected, information)
+        for excluded in ["버스 노선", "교통", "택시팟", "여행팟"]:
+            self.assertNotIn(excluded, information)
+        self.assertIn("9명 <small>90.0%</small>", movement)
+        self.assertIn("2명 <small>50.0%</small>", movement)
+        self.assertIn("4명 <small>100.0%</small>", information)
+
+    def test_comparison_shows_top_signal_count_and_group_percentage(self):
+        markup = comparison_html(self.context)
+
+        self.assertIn("한국인 · n=4", markup)
+        self.assertIn("택시팟", markup)
+        self.assertIn("2명 · 50.0%", markup)
+        self.assertIn("외국인 · n=3", markup)
+        self.assertIn("공지", markup)
+        self.assertIn("2명 · 66.7%", markup)
+
+    def test_comparison_handles_empty_groups_without_inventing_a_signal(self):
+        empty = survey(0, source="empty", loaded_at="-")
+
+        markup = comparison_html(build_brief_context(empty, empty))
+
+        self.assertEqual(markup.count("응답 수집 중"), 2)
+        self.assertNotRegex(markup, r"[1-9][0-9]*명")
 
     def test_comparison_names_both_groups_and_denominators(self):
         markup = comparison_html(self.context)
@@ -130,7 +217,7 @@ class ResearchBriefHtmlTest(unittest.TestCase):
         self.assertNotIn("<strong>택시팟</strong>", markup)
         self.assertNotIn("<b>source</b>", markup)
         self.assertNotIn("<time>", markup)
-        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", markup)
+        self.assertNotIn("alert(1)", markup)
         self.assertIn("&lt;strong&gt;택시팟&lt;/strong&gt;", markup)
         self.assertIn("&lt;b&gt;source&lt;/b&gt;", markup)
         self.assertIn("&lt;time&gt;", markup)

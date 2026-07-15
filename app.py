@@ -19,6 +19,7 @@ from src.research_brief import (
     BriefContext,
     build_brief_context,
     comparison_html,
+    conclusion_html,
     findings_html,
     intro_html,
     product_bridge_html,
@@ -40,16 +41,14 @@ def apply_page_style() -> None:
         """
 <style>
 :root {
-    --ara-bg: #f6f8fb;
-    --ara-card: #ffffff;
-    --ara-text: #172033;
-    --ara-muted: #64748b;
-    --ara-line: #dbe4ef;
-    --ara-blue: #2563eb;
-    --ara-teal: #0f766e;
-    --ara-sky: #0ea5e9;
-    --ara-green: #16a34a;
-    --ara-orange: #f97316;
+    --ara-bg: #fbfcfd;
+    --ara-card: #fbfcfd;
+    --ara-text: #13233d;
+    --ara-muted: #66768a;
+    --ara-line: #d8e2e9;
+    --ara-blue: #132e50;
+    --ara-teal: #087f72;
+    --ara-coral: #ec6a5f;
 }
 
 html, body, [data-testid="stAppViewContainer"], .stApp {
@@ -96,16 +95,13 @@ p, li, .stMarkdown, [data-testid="stCaptionContainer"] {
 
 div[data-testid="stVerticalBlockBorderWrapper"] {
     border-color: var(--ara-line);
-    border-radius: 20px;
+    border-radius: 8px;
     background: var(--ara-card);
-    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
 }
 
 div[data-testid="stVerticalBlockBorderWrapper"]:has(h1) {
-    border-color: #bfdbfe;
-    background:
-        linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(20, 184, 166, 0.08)),
-        #ffffff;
+    border-color: var(--ara-line);
+    background: var(--ara-bg);
 }
 
 div[data-testid="stProgress"] {
@@ -113,20 +109,20 @@ div[data-testid="stProgress"] {
 }
 
 div[data-testid="stProgress"] > div > div {
-    background-color: #e7edf4;
+    background-color: var(--ara-line);
 }
 
 div[data-testid="stProgress"] > div > div > div {
-    background: linear-gradient(90deg, var(--ara-blue), var(--ara-teal));
+    background: var(--ara-teal);
 }
 
 .stButton > button,
 div.stDownloadButton > button {
     width: 100%;
     min-height: 2.8rem;
-    border-radius: 12px;
-    border: 1px solid #cbd5e1;
-    background: #ffffff;
+    border-radius: 8px;
+    border: 1px solid var(--ara-line);
+    background: var(--ara-bg);
     color: var(--ara-text);
     font-weight: 700;
 }
@@ -156,7 +152,6 @@ div[role="radiogroup"] label {
     border: 1px solid var(--ara-line);
     border-radius: 8px;
     background: var(--ara-card);
-    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
 }
 
 .field-total {
@@ -165,13 +160,13 @@ div[role="radiogroup"] label {
     justify-content: space-between;
     gap: 1rem;
     padding: 1.25rem 1.4rem;
-    color: #ffffff;
-    background: #172f57;
+    color: var(--ara-bg);
+    background: var(--ara-bridge, #132e50);
 }
 
 .field-label {
     margin-bottom: 0.25rem;
-    color: #cbdcf6;
+    color: var(--ara-line);
     font-size: 0.82rem;
     font-weight: 700;
 }
@@ -183,7 +178,7 @@ div[role="radiogroup"] label {
 }
 
 .field-live {
-    color: #d6fff5;
+    color: var(--ara-bg);
     font-size: 0.82rem;
     font-weight: 700;
     text-align: right;
@@ -244,8 +239,7 @@ div[role="radiogroup"] label {
     }
 
     div[data-testid="stVerticalBlockBorderWrapper"] {
-        border-radius: 16px;
-        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.045);
+        border-radius: 8px;
     }
 
     h1 {
@@ -321,6 +315,15 @@ def render_html(html: str, height: int) -> None:
 def chart_theme() -> str:
     return """
 <style>
+:root {
+    --chart-navy: #13233d;
+    --chart-teal: #087f72;
+    --chart-coral: #ec6a5f;
+    --chart-bg: #fbfcfd;
+    --chart-line: #d8e2e9;
+    --chart-muted: #66768a;
+    --chart-bridge: #132e50;
+}
 * {
     box-sizing: border-box;
 }
@@ -328,24 +331,21 @@ def chart_theme() -> str:
 body {
     margin: 0;
     padding: 0;
-    color: #172033;
+    color: var(--chart-navy);
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     background: transparent;
 }
 
 .chart-card {
     width: 100%;
-    border: 1px solid #dbe4ef;
-    border-radius: 20px;
-    background:
-        linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,252,0.96)),
-        #ffffff;
-    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.055);
+    border: 1px solid var(--chart-line);
+    border-radius: 8px;
+    background: var(--chart-bg);
     padding: clamp(16px, 4vw, 24px);
 }
 
 .chart-kicker {
-    color: #64748b;
+    color: var(--chart-muted);
     font-size: 12px;
     font-weight: 800;
     letter-spacing: 0;
@@ -360,10 +360,10 @@ body {
 
 .summary-card {
     min-height: 126px;
-    border-radius: 18px;
+    border-radius: 8px;
     padding: 16px;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
+    background: var(--chart-bg);
+    border: 1px solid var(--chart-line);
     position: relative;
     overflow: hidden;
 }
@@ -375,18 +375,18 @@ body {
     top: 0;
     width: 5px;
     height: 100%;
-    background: linear-gradient(180deg, #2563eb, #0f766e);
+    background: var(--chart-teal);
 }
 
 .summary-label {
-    color: #64748b;
+    color: var(--chart-muted);
     font-size: 12px;
     font-weight: 800;
 }
 
 .summary-value {
     margin-top: 10px;
-    color: #172033;
+    color: var(--chart-navy);
     font-size: clamp(23px, 6vw, 33px);
     line-height: 1.1;
     font-weight: 900;
@@ -395,7 +395,7 @@ body {
 
 .summary-note {
     margin-top: 8px;
-    color: #0f766e;
+    color: var(--chart-teal);
     font-size: 12px;
     font-weight: 800;
 }
@@ -421,19 +421,19 @@ body {
 .bar-track {
     height: 16px;
     overflow: hidden;
-    border-radius: 999px;
-    background: #e8eef5;
+    border-radius: 3px;
+    background: var(--chart-line);
 }
 
 .bar-fill {
     height: 100%;
     min-width: 9px;
-    border-radius: 999px;
-    background: linear-gradient(90deg, #2563eb, #0f766e);
+    border-radius: 3px;
+    background: var(--chart-teal);
 }
 
 .bar-value {
-    color: #475569;
+    color: var(--chart-muted);
     font-size: 13px;
     font-weight: 800;
     text-align: right;
@@ -452,12 +452,11 @@ body {
     aspect-ratio: 1;
     border-radius: 50%;
     background: conic-gradient(
-        #2563eb 0 var(--positive),
-        #f59e0b var(--positive) var(--neutral),
-        #ef4444 var(--neutral) 100%
+        var(--chart-teal) 0 var(--positive),
+        var(--chart-line) var(--positive) var(--neutral),
+        var(--chart-coral) var(--neutral) 100%
     );
     position: relative;
-    box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.05);
 }
 
 .donut::after {
@@ -467,8 +466,8 @@ body {
     display: grid;
     place-items: center;
     border-radius: 50%;
-    background: #ffffff;
-    color: #172033;
+    background: var(--chart-bg);
+    color: var(--chart-navy);
     font-size: 24px;
     font-weight: 900;
 }
@@ -496,7 +495,7 @@ body {
 }
 
 .legend-value {
-    color: #475569;
+    color: var(--chart-muted);
     font-size: 13px;
     font-weight: 800;
     white-space: nowrap;
@@ -600,9 +599,9 @@ def intent_chart_html(intent: list[tuple[str, int]], total: int) -> str:
     positive_end = positive / total * 100 if total else 0
     neutral_end = (positive + neutral) / total * 100 if total else 0
     legend = [
-        ("긍정", positive, "#2563eb"),
-        ("중립", neutral, "#f59e0b"),
-        ("부정", negative, "#ef4444"),
+        ("긍정", positive, "#087f72"),
+        ("중립", neutral, "#66768a"),
+        ("부정", negative, "#ec6a5f"),
     ]
     legend_markup = "\n".join(
         f"""
@@ -674,6 +673,10 @@ def render_header(
 def render_research_findings(context: BriefContext) -> None:
     st.markdown(findings_html(context), unsafe_allow_html=True)
     st.markdown(comparison_html(context), unsafe_allow_html=True)
+
+
+def render_conclusion(context: BriefContext) -> None:
+    st.markdown(conclusion_html(context), unsafe_allow_html=True)
 
 
 def render_product_bridge(context: BriefContext) -> None:
@@ -1164,6 +1167,7 @@ def render_survey_dashboard() -> None:
         st.cache_data.clear()
         st.rerun()
 
+    render_conclusion(context)
     render_research_findings(context)
     render_product_bridge(context)
     st.markdown("## 상세 조사 결과")

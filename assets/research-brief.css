@@ -40,6 +40,7 @@
 .research-compare > div { padding: 16px; border: 1px solid var(--research-line); border-radius: 8px; background: var(--research-bg); }
 .research-compare span { color: var(--research-muted); font-size: 12px; }
 .research-compare strong { display: block; margin-top: 5px; font-size: 20px; }
+.research-compare small { display: block; margin-top: 4px; color: var(--research-muted); }
 .research-interpretation { margin: 14px 0 0; color: var(--research-muted); }
 .research-product-bridge { max-width: 960px; margin: 0 auto; padding: 34px 28px; border-radius: 8px; background: var(--research-bridge); color: var(--research-bg); }
 .research-product-bridge h2 { max-width: 680px; margin: 8px 0; color: var(--research-bg); font-size: 28px; }

@@ -76,6 +76,26 @@ INTENT_GROUPS = {
     "부정": ["안 사용할 것 같다", "절대 안 사용", "Probably would not use it", "Definitely would not use it"],
 }
 
+EMAIL_PATTERN = re.compile(r"\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b", re.IGNORECASE)
+PHONE_PATTERN = re.compile(
+    r"(?<!\d)(?:\+\d{1,3}[\s.-]*)?(?:\(?\d{2,4}\)?[\s.-]*)"
+    r"\d{3,4}[\s.-]*\d{4}(?!\d)"
+)
+URL_PATTERN = re.compile(
+    r"(?:https?://|www\.)\S+|\b[A-Z0-9][A-Z0-9.-]*\."
+    r"(?:com|net|org|io|kr|co\.kr)(?:/\S*)?",
+    re.IGNORECASE,
+)
+HANDLE_PATTERN = re.compile(r"(?<!\w)@[A-Z0-9._]{2,}\b", re.IGNORECASE)
+CONTACT_LABEL_PATTERN = re.compile(
+    r"(?:카톡|카카오톡|인스타|전화|연락처|이메일)\s*"
+    r"(?:(?:아이디|id|계정|번호)\s*)?[:：]\s*\S+"
+    r"|(?:카톡|카카오톡|인스타|전화|연락처|이메일)\s+"
+    r"(?:아이디|id|계정|번호)\s*[:：]?\s*\S+"
+    r"|(?:카톡|카카오톡|인스타|연락처)\s+[A-Z0-9_.-]{3,}",
+    re.IGNORECASE,
+)
+
 
 def get_secret_value(key: str, default: str = "") -> str:
     try:
@@ -159,6 +179,10 @@ def load_json(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def file_modified_at(path: Path) -> str:
+    return datetime.fromtimestamp(path.stat().st_mtime).strftime("%Y-%m-%d %H:%M")
+
+
 def quote_sheet_range(title: str) -> str:
     return f"'{title.replace(chr(39), chr(39) + chr(39))}'!A:Z"
 
@@ -231,7 +255,17 @@ def collect_comments(rows: list[dict[str, str]], column: str | None) -> list[str
     for row in rows:
         value = row.get(column, "").strip()
         normalized = value.lower().replace(".", "").strip()
-        if normalized in ignored:
+        has_pii = any(
+            pattern.search(value)
+            for pattern in (
+                EMAIL_PATTERN,
+                PHONE_PATTERN,
+                URL_PATTERN,
+                HANDLE_PATTERN,
+                CONTACT_LABEL_PATTERN,
+            )
+        )
+        if normalized in ignored or has_pii:
             continue
         comments.append(value)
     return comments
@@ -303,8 +337,8 @@ def build_foreign_report_data(rows: list[dict[str, str]]) -> dict[str, Any]:
         ),
         "openchat_pain": top_items(
             count_multi(rows, columns["openchat_pain"]),
-            ["글이 너무 많다", "원하는 글 찾기 어렵다", "검색 기능 불편", "지난 글 찾기 어렵다", "채팅이 빨리 올라간다", "모집 종료 글 노출"],
-            6,
+            ["글이 너무 많다", "원하는 글 찾기 어렵다", "검색 기능 불편", "지난 글 찾기 어렵다", "채팅이 빨리 올라간다", "모집 종료 글 노출", "정보 정확성 모르겠다"],
+            7,
         ),
         "intent": [("긍정", intent["긍정"]), ("중립", intent["중립"]), ("부정", intent["부정"])],
         "comments": collect_comments(rows, columns["comment"]),
@@ -316,12 +350,16 @@ def get_public_survey() -> dict[str, Any]:
     spreadsheet = get_secret_value("ARA_SURVEY_SPREADSHEET", os.getenv("ARA_SURVEY_SPREADSHEET", DEFAULT_SPREADSHEET))
     credentials_path = get_credentials_path()
 
-    source = "Google Sheets"
+    source = "empty"
+    loaded_at = "-"
     error = ""
     rows: list[dict[str, str]] = []
     if credentials_path.exists():
         try:
             rows = load_sheets(normalize_spreadsheet_id(spreadsheet), credentials_path)
+            if rows:
+                source = "Google Sheets"
+                loaded_at = datetime.now().strftime("%Y-%m-%d %H:%M")
         except Exception as exc:
             error = f"Google Sheets 연결 실패: {type(exc).__name__}"
             rows = []
@@ -329,6 +367,7 @@ def get_public_survey() -> dict[str, Any]:
     if not rows and DEFAULT_CSV.exists():
         rows = load_csv(DEFAULT_CSV)
         source = "CSV fallback"
+        loaded_at = file_modified_at(DEFAULT_CSV)
     elif not rows:
         source = "empty"
 
@@ -338,7 +377,7 @@ def get_public_survey() -> dict[str, Any]:
         "rows": len(rows),
         "source": source,
         "error": error,
-        "loaded_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "loaded_at": loaded_at,
     }
 
 
@@ -351,12 +390,15 @@ def get_foreign_survey() -> dict[str, Any]:
     credentials_path = get_credentials_path()
 
     source = "empty"
+    loaded_at = "-"
     error = ""
     rows: list[dict[str, str]] = []
     if spreadsheet and credentials_path.exists():
         try:
             rows = load_sheets(normalize_spreadsheet_id(spreadsheet), credentials_path)
-            source = "Google Sheets"
+            if rows:
+                source = "Google Sheets"
+                loaded_at = datetime.now().strftime("%Y-%m-%d %H:%M")
         except Exception as exc:
             error = f"외국인 설문 Google Sheets 연결 실패: {type(exc).__name__}"
             rows = []
@@ -367,9 +409,11 @@ def get_foreign_survey() -> dict[str, Any]:
         rows = load_csv(DEFAULT_FOREIGN_CSV)
         data = build_foreign_report_data(rows)
         source = "CSV"
+        loaded_at = file_modified_at(DEFAULT_FOREIGN_CSV)
     elif DEFAULT_FOREIGN_SUMMARY.exists():
         data = load_json(DEFAULT_FOREIGN_SUMMARY)
         source = "CSV summary"
+        loaded_at = file_modified_at(DEFAULT_FOREIGN_SUMMARY)
     else:
         data = {
         "n": 0,
@@ -388,5 +432,5 @@ def get_foreign_survey() -> dict[str, Any]:
         "rows": int(data["n"]),
         "source": source,
         "error": error,
-        "loaded_at": datetime.now().strftime("%Y-%m-%d %H:%M"),
+        "loaded_at": loaded_at,
     }
