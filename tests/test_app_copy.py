@@ -123,28 +123,37 @@ class AppCopyTest(unittest.TestCase):
             and isinstance(node.value, str)
             and "<style>" in node.value
         )
+        active_css = "\n".join(
+            [
+                embedded_css,
+                Path("assets/research-brief.css").read_text(encoding="utf-8"),
+            ]
+        )
         literal_colors = {
             match.group(0).upper()
             for match in re.finditer(
                 r"#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|"
                 r"[0-9a-fA-F]{4}|[0-9a-fA-F]{3})(?![0-9a-fA-F])",
-                embedded_css,
+                active_css,
             )
         }
 
-        self.assertTrue(embedded_css)
+        self.assertTrue(active_css)
         self.assertLessEqual(literal_colors, approved_colors)
-        self.assertNotRegex(embedded_css, r"(?i)linear-gradient\s*\(")
-        self.assertNotRegex(embedded_css, r"(?i)rgba\s*\(")
+        self.assertNotRegex(
+            active_css,
+            r"(?i)(?:linear|radial|conic)-gradient\s*\(",
+        )
+        self.assertNotRegex(active_css, r"(?i)rgba\s*\(")
 
-        for rule in re.finditer(r"(?P<selectors>[^{}]+)\{(?P<body>[^{}]*)\}", embedded_css):
+        for rule in re.finditer(r"(?P<selectors>[^{}]+)\{(?P<body>[^{}]*)\}", active_css):
             selectors = {item.strip() for item in rule.group("selectors").split(",")}
             for radius in re.findall(
                 r"border-radius\s*:\s*([^;{}]+)", rule.group("body"), re.IGNORECASE
             ):
                 value = radius.strip().lower()
                 if value == "50%":
-                    self.assertLessEqual(selectors, {".donut", ".donut::after", ".dot"})
+                    self.assertLessEqual(selectors, {".dot"})
                 else:
                     match = re.fullmatch(r"([0-9]+(?:\.[0-9]+)?)px", value)
                     self.assertIsNotNone(match, f"unsupported radius {value!r} in {selectors}")
@@ -170,6 +179,59 @@ class AppCopyTest(unittest.TestCase):
         }
 
         self.assertLessEqual(literal_colors, approved_colors)
+
+    def test_page_entry_animation_only_runs_when_motion_is_allowed(self) -> None:
+        apply_style = self.functions["apply_page_style"]
+        stylesheet = "\n".join(
+            str(node.value)
+            for node in ast.walk(apply_style)
+            if isinstance(node, ast.Constant)
+            and isinstance(node.value, str)
+            and "<style>" in node.value
+        )
+        motion_block = re.search(
+            r"@media\s*\(prefers-reduced-motion:\s*no-preference\)\s*\{"
+            r"\s*\.main\s+\.block-container\s*>\s*div\s*\{"
+            r"[^{}]*\banimation\s*:[^{}]+\}\s*\}",
+            stylesheet,
+            re.IGNORECASE | re.DOTALL,
+        )
+
+        self.assertIsNotNone(motion_block)
+        stylesheet_without_motion_block = (
+            stylesheet[: motion_block.start()] + stylesheet[motion_block.end() :]
+        )
+        self.assertNotRegex(
+            stylesheet_without_motion_block,
+            r"(?is)\.main\s+\.block-container\s*>\s*div\s*\{"
+            r"[^{}]*\banimation\s*:",
+        )
+
+    def test_intent_chart_uses_three_adjacent_segments_with_complete_labels(self) -> None:
+        markup = intent_chart_html(
+            [("긍정", 2), ("중립", 1), ("부정", 1)],
+            4,
+        )
+
+        self.assertIn('class="intent-bar"', markup)
+        self.assertEqual(markup.count('class="intent-segment '), 3)
+        self.assertNotIn("donut", markup)
+        self.assertIn('class="intent-segment positive" style="width:50.0%"', markup)
+        self.assertIn('class="intent-segment neutral" style="width:25.0%"', markup)
+        self.assertIn('class="intent-segment negative" style="width:25.0%"', markup)
+        for expected in ["긍정", "2명 · 50.0%", "중립", "1명 · 25.0%", "부정"]:
+            self.assertIn(expected, markup)
+
+    def test_intent_chart_handles_zero_total_without_invalid_widths(self) -> None:
+        markup = intent_chart_html(
+            [("긍정", 0), ("중립", 0), ("부정", 0)],
+            0,
+        )
+
+        self.assertEqual(markup.count('style="width:0.0%"'), 3)
+        self.assertEqual(markup.count("0명 · 0.0%"), 3)
+        self.assertNotRegex(markup, r"(?i)(?:nan|inf)%")
+        self.assertNotIn("donut", markup)
 
     def test_dashboard_renders_product_bridge_exactly_once(self) -> None:
         bridge_calls = [

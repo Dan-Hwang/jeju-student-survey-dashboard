@@ -54,3 +54,27 @@ The first attempt with the machine-level Python 3.14 was discarded because it fa
 
 - Unit tests intentionally emit Streamlit `No runtime found` cache warnings outside a Streamlit process; these do not fail tests.
 - Verification uses mocked/local loader boundaries and does not contact the production Google Sheets service.
+
+## Follow-up Review Fixes
+
+Base: `99bbc7f`
+
+### RED Evidence
+
+1. Table-driven privacy tests failed on English Instagram/Kakao assignments, `bit.ly` and `naver.me` paths, while also rejecting ordinary Korean phone and Instagram feedback.
+2. Intent-chart tests failed because active CSS still contained `conic-gradient`, the renderer emitted donut markup instead of three segments, and total zero emitted no safe segment widths.
+3. The reduced-motion test failed because the page-container animation declaration was outside any `prefers-reduced-motion` media query.
+
+### GREEN Evidence
+
+- Privacy target: 3 tests passed, covering 12 blocked and 8 allowed table cases plus the existing foreign information signal.
+- Intent target: 4 tests passed for the active CSS contract, approved colors, three complete segments, and total-zero safety.
+- Follow-up target: 8 tests passed across privacy, intent, and reduced-motion behavior.
+- Full suite: 48 tests passed, 0 failures.
+- `python -m py_compile app.py src/survey_dashboard.py`: exit 0.
+- `git diff --check`: exit 0 with Windows LF-to-CRLF conversion warnings only.
+
+### Remaining Concerns
+
+- Contact filtering deliberately requires assignment syntax or an identifier-shaped direct value so ordinary Instagram, Kakao, and phone-related prose remains public.
+- Short bare domains are treated as URLs when they include a path; ordinary version-like dotted prose remains allowed.

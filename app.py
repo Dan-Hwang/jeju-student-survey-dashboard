@@ -229,8 +229,10 @@ div[role="radiogroup"] label {
     }
 }
 
-.main .block-container > div {
-    animation: araFadeUp 0.35s ease-out both;
+@media (prefers-reduced-motion: no-preference) {
+    .main .block-container > div {
+        animation: araFadeUp 0.35s ease-out both;
+    }
 }
 
 @media (max-width: 640px) {
@@ -442,34 +444,34 @@ body {
 
 .intent-layout {
     display: grid;
-    grid-template-columns: 180px 1fr;
-    gap: 22px;
-    align-items: center;
+    gap: 18px;
 }
 
-.donut {
-    width: 168px;
-    aspect-ratio: 1;
-    border-radius: 50%;
-    background: conic-gradient(
-        var(--chart-teal) 0 var(--positive),
-        var(--chart-line) var(--positive) var(--neutral),
-        var(--chart-coral) var(--neutral) 100%
-    );
-    position: relative;
+.intent-bar {
+    display: flex;
+    overflow: hidden;
+    width: 100%;
+    height: 18px;
+    border: 1px solid var(--chart-line);
+    border-radius: 3px;
+    background: var(--chart-line);
 }
 
-.donut::after {
-    content: attr(data-total);
-    position: absolute;
-    inset: 34px;
-    display: grid;
-    place-items: center;
-    border-radius: 50%;
-    background: var(--chart-bg);
-    color: var(--chart-navy);
-    font-size: 24px;
-    font-weight: 900;
+.intent-segment {
+    display: block;
+    height: 100%;
+}
+
+.intent-segment.positive, .dot.positive {
+    background: var(--chart-teal);
+}
+
+.intent-segment.neutral, .dot.neutral {
+    background: var(--chart-muted);
+}
+
+.intent-segment.negative, .dot.negative {
+    background: var(--chart-coral);
 }
 
 .legend {
@@ -520,14 +522,6 @@ body {
         text-align: left;
     }
 
-    .intent-layout {
-        grid-template-columns: 1fr;
-    }
-
-    .donut {
-        width: min(180px, 58vw);
-        margin: 0 auto;
-    }
 }
 </style>
 """
@@ -596,28 +590,33 @@ def intent_chart_html(intent: list[tuple[str, int]], total: int) -> str:
     positive = values.get("긍정", 0)
     neutral = values.get("중립", 0)
     negative = values.get("부정", 0)
-    positive_end = positive / total * 100 if total else 0
-    neutral_end = (positive + neutral) / total * 100 if total else 0
     legend = [
-        ("긍정", positive, "#087f72"),
-        ("중립", neutral, "#66768a"),
-        ("부정", negative, "#ec6a5f"),
+        ("긍정", positive, "positive"),
+        ("중립", neutral, "neutral"),
+        ("부정", negative, "negative"),
     ]
+    segments = []
+    for label, value, accent in legend:
+        width = max(0.0, min(100.0, value / total * 100)) if total > 0 else 0.0
+        segments.append(
+            f'<span class="intent-segment {accent}" style="width:{width:.1f}%" '
+            f'aria-label="{escape(label)} {value}명 {pct(value, total)}"></span>'
+        )
     legend_markup = "\n".join(
         f"""
 <div class="legend-row">
-    <span class="dot" style="background:{color}"></span>
+    <span class="dot {accent}"></span>
     <span class="legend-label">{escape(label)}</span>
     <span class="legend-value">{value}명 · {pct(value, total)}</span>
 </div>
 """
-        for label, value, color in legend
+        for label, value, accent in legend
     )
     return f"""
 {chart_theme()}
 <section class="chart-card">
     <div class="intent-layout">
-        <div class="donut" data-total="{positive}명 긍정" style="--positive:{positive_end}%; --neutral:{neutral_end}%;"></div>
+        <div class="intent-bar">{''.join(segments)}</div>
         <div class="legend">{legend_markup}</div>
     </div>
 </section>

@@ -115,32 +115,44 @@ class SurveyFreshnessTest(unittest.TestCase):
 
 
 class PublicCommentPrivacyTest(unittest.TestCase):
-    def test_collect_comments_excludes_pii_and_preserves_ordinary_feedback(self) -> None:
-        comments = [
-            "메일은 student@example.com 입니다",
-            "전화 010-1234-5678",
-            "Call me at +1 415 555 2671",
-            "https://example.com/profile 에 남겼어요",
-            "인스타 @jeju_friend",
-            "카톡 ID: jeju2026",
-            "카톡 jeju2026",
-            "연락처: 비밀계정",
-            "버스 노선 정보가 더 정확하면 좋겠어요",
-            "It would be easier to find old announcements.",
-        ]
-        rows = [{"comment": value} for value in comments]
+    def test_collect_comments_blocks_identifier_shaped_contact_data(self) -> None:
+        blocked_cases = {
+            "email": "메일은 student@example.com 입니다",
+            "korean_phone": "전화 010-1234-5678",
+            "international_phone": "Call me at +1 415 555 2671",
+            "full_url": "https://example.com/profile 에 남겼어요",
+            "handle": "인스타 @jeju_friend",
+            "korean_kakao_id": "카톡 ID: jeju2026",
+            "plain_kakao_id": "카톡 jeju2026",
+            "korean_contact_value": "연락처: 비밀계정",
+            "english_instagram": "Instagram: jeju_friend",
+            "english_kakao": "Kakao ID: jeju2026",
+            "bitly_short_url": "bit.ly/private",
+            "naver_short_url": "naver.me/private",
+        }
 
-        result = collect_comments(rows, "comment")
+        for case, comment in blocked_cases.items():
+            with self.subTest(case=case):
+                self.assertEqual(collect_comments([{"comment": comment}], "comment"), [])
 
-        self.assertEqual(
-            result,
-            [
-                "버스 노선 정보가 더 정확하면 좋겠어요",
-                "It would be easier to find old announcements.",
-            ],
-        )
-        for private_value in comments[:8]:
-            self.assertNotIn(private_value, result)
+    def test_collect_comments_allows_ordinary_contact_related_feedback(self) -> None:
+        allowed_cases = {
+            "korean_phone_prose": "전화 번호 확인이 어려워요",
+            "korean_instagram_prose": "인스타 계정 찾기 어려워요",
+            "korean_kakao_prose": "카카오톡 검색이 불편해요",
+            "english_instagram_prose": "Instagram account search is difficult.",
+            "english_kakao_prose": "Kakao search needs better filters.",
+            "ordinary_korean": "버스 노선 정보가 더 정확하면 좋겠어요",
+            "ordinary_english": "It would be easier to find old announcements.",
+            "dotted_prose": "Version 1.2.3 was easier to understand.",
+        }
+
+        for case, comment in allowed_cases.items():
+            with self.subTest(case=case):
+                self.assertEqual(
+                    collect_comments([{"comment": comment}], "comment"),
+                    [comment],
+                )
 
     def test_foreign_information_accuracy_signal_reaches_report_data(self) -> None:
         rows = [

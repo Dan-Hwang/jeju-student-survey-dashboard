@@ -82,17 +82,20 @@ PHONE_PATTERN = re.compile(
     r"\d{3,4}[\s.-]*\d{4}(?!\d)"
 )
 URL_PATTERN = re.compile(
-    r"(?:https?://|www\.)\S+|\b[A-Z0-9][A-Z0-9.-]*\."
-    r"(?:com|net|org|io|kr|co\.kr)(?:/\S*)?",
+    r"(?:https?://|www\.)\S+"
+    r"|\b(?:[A-Z0-9-]+\.)+[A-Z]{2,24}/[^\s,;]+"
+    r"|\b[A-Z0-9][A-Z0-9.-]*\.(?:com|net|org|io|kr|co\.kr)(?:/\S*)?",
     re.IGNORECASE,
 )
 HANDLE_PATTERN = re.compile(r"(?<!\w)@[A-Z0-9._]{2,}\b", re.IGNORECASE)
 CONTACT_LABEL_PATTERN = re.compile(
-    r"(?:카톡|카카오톡|인스타|전화|연락처|이메일)\s*"
-    r"(?:(?:아이디|id|계정|번호)\s*)?[:：]\s*\S+"
-    r"|(?:카톡|카카오톡|인스타|전화|연락처|이메일)\s+"
-    r"(?:아이디|id|계정|번호)\s*[:：]?\s*\S+"
-    r"|(?:카톡|카카오톡|인스타|연락처)\s+[A-Z0-9_.-]{3,}",
+    r"(?:카톡|카카오톡|인스타|전화|연락처|이메일|instagram|kakao(?:talk)?)\s+"
+    r"(?:아이디|id|계정|번호|account)\s*[:=：]\s*[^\s,;]{2,}"
+    r"|(?:카톡|카카오톡|인스타|전화|연락처|이메일)\s*[:=：]\s*[^\s,;]{2,}"
+    r"|(?:instagram|kakao(?:talk)?)\s*[:=：]\s*"
+    r"(?=[A-Z0-9@._-]{3,}(?:\b|$))(?=[A-Z0-9@._-]*[0-9@._-])[A-Z0-9@._-]+"
+    r"|(?:카톡|카카오톡|인스타|연락처|instagram|kakao(?:talk)?)\s+"
+    r"(?=[A-Z0-9@._-]{3,}(?:\b|$))(?=[A-Z0-9@._-]*[0-9@._-])[A-Z0-9@._-]+",
     re.IGNORECASE,
 )
 
