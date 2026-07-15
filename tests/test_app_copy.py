@@ -147,21 +147,33 @@ class AppCopyTest(unittest.TestCase):
             for node in ast.walk(overall)
             if isinstance(node, ast.Call) and call_name(node) == "render_rank_section"
         ]
-        denominator_by_title = {
-            str(call.args[0].value): call.args[3].id
+        binding_by_title = {
+            str(call.args[0].value): (
+                (call.args[2].value.id, str(call.args[2].slice.value)),
+                call.args[3].id,
+            )
             for call in rank_calls
             if len(call.args) == 4
             and isinstance(call.args[0], ast.Constant)
+            and isinstance(call.args[2], ast.Subscript)
+            and isinstance(call.args[2].value, ast.Name)
+            and isinstance(call.args[2].slice, ast.Constant)
             and isinstance(call.args[3], ast.Name)
         }
 
         self.assertEqual(
-            denominator_by_title,
+            binding_by_title,
             {
-                "한국인 핵심 불편": "korean_total",
-                "한국인 오픈채팅 수요": "korean_total",
-                "외국인 핵심 불편": "foreign_total",
-                "외국인 오픈채팅 수요": "foreign_total",
+                "한국인 핵심 불편": (("korean", "pain"), "korean_total"),
+                "한국인 오픈채팅 수요": (
+                    ("korean", "openchat_find"),
+                    "korean_total",
+                ),
+                "외국인 핵심 불편": (("foreign", "pain"), "foreign_total"),
+                "외국인 오픈채팅 수요": (
+                    ("foreign", "openchat_find"),
+                    "foreign_total",
+                ),
             },
         )
         self.assertFalse(
@@ -197,6 +209,11 @@ class AppCopyTest(unittest.TestCase):
             for keyword in radio.keywords
             if keyword.arg == "horizontal"
         )
+        index_keywords = [
+            keyword.value
+            for keyword in radio.keywords
+            if keyword.arg == "index"
+        ]
 
         self.assertEqual(
             options,
@@ -204,6 +221,10 @@ class AppCopyTest(unittest.TestCase):
         )
         self.assertIsInstance(horizontal, ast.Constant)
         self.assertIs(horizontal.value, True)
+        self.assertLessEqual(len(index_keywords), 1)
+        if index_keywords:
+            self.assertIsInstance(index_keywords[0], ast.Constant)
+            self.assertEqual(index_keywords[0].value, 0)
 
         renderer_if = next(
             statement

@@ -209,6 +209,32 @@ class ProductBridgeTest(unittest.TestCase):
 
 
 class ResearchBriefCssTest(unittest.TestCase):
+    def test_korean_heading_wrap_is_targeted_and_overflow_safe(self):
+        stylesheet = (
+            Path(__file__).resolve().parents[1] / "assets" / "research-brief.css"
+        ).read_text(encoding="utf-8")
+        rules = [
+            (match.group("selectors").strip(), match.group("body"))
+            for match in re.finditer(
+                r"(?P<selectors>[^{}]+)\{(?P<body>[^{}]*)\}",
+                stylesheet,
+            )
+            if re.search(r"\b(?:word-break|overflow-wrap)\s*:", match.group("body"))
+        ]
+
+        self.assertEqual(len(rules), 1)
+        selectors, declarations = rules[0]
+        self.assertEqual(
+            {selector.strip() for selector in selectors.split(",")},
+            {
+                ".research-hero h1",
+                ".research-section h2",
+                ".research-product-bridge h2",
+            },
+        )
+        self.assertRegex(declarations, r"\bword-break\s*:\s*keep-all\s*;")
+        self.assertRegex(declarations, r"\boverflow-wrap\s*:\s*anywhere\s*;")
+
     def test_stylesheet_uses_only_the_approved_palette(self):
         stylesheet = (
             Path(__file__).resolve().parents[1] / "assets" / "research-brief.css"
