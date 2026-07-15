@@ -87,17 +87,33 @@ URL_PATTERN = re.compile(
     r"|\b[A-Z0-9][A-Z0-9.-]*\.(?:com|net|org|io|kr|co\.kr)(?:/\S*)?",
     re.IGNORECASE,
 )
-HANDLE_PATTERN = re.compile(r"(?<!\w)@[A-Z0-9._]{2,}\b", re.IGNORECASE)
+HANDLE_PATTERN = re.compile(r"(?<!\w)@(?P<handle>[A-Z0-9._]{2,})\b", re.IGNORECASE)
 CONTACT_LABEL_PATTERN = re.compile(
-    r"(?:카톡|카카오톡|인스타|전화|연락처|이메일|instagram|kakao(?:talk)?)\s+"
-    r"(?:아이디|id|계정|번호|account)\s*[:=：]\s*[^\s,;]{2,}"
-    r"|(?:카톡|카카오톡|인스타|전화|연락처|이메일)\s*[:=：]\s*[^\s,;]{2,}"
-    r"|(?:instagram|kakao(?:talk)?)\s*[:=：]\s*"
-    r"(?=[A-Z0-9@._-]{3,}(?:\b|$))(?=[A-Z0-9@._-]*[0-9@._-])[A-Z0-9@._-]+"
-    r"|(?:카톡|카카오톡|인스타|연락처|instagram|kakao(?:talk)?)\s+"
-    r"(?=[A-Z0-9@._-]{3,}(?:\b|$))(?=[A-Z0-9@._-]*[0-9@._-])[A-Z0-9@._-]+",
+    r"(?<!\w)(?:카톡|카카오톡|인스타|전화|연락처|이메일|instagram|"
+    r"kakao(?:talk)?|phone|telephone|contact|email)(?!\w)",
     re.IGNORECASE,
 )
+CONTACT_ASSIGNMENT_PATTERN = re.compile(
+    r"^(?:\s*(?:아이디|id|계정|번호|account|handle|username)"
+    r"(?:\s*[:=：]\s*|\s+)"
+    r"|\s*[:=：]\s*|\s+)(?P<identifier>[^\s,;]{2,})\s*$",
+    re.IGNORECASE,
+)
+RESERVED_HANDLES = {"everyone", "channel", "here"}
+
+
+def contains_contact_assignment(value: str) -> bool:
+    return any(
+        CONTACT_ASSIGNMENT_PATTERN.fullmatch(value[label.end() :])
+        for label in CONTACT_LABEL_PATTERN.finditer(value)
+    )
+
+
+def contains_personal_handle(value: str) -> bool:
+    return any(
+        match.group("handle").lower() not in RESERVED_HANDLES
+        for match in HANDLE_PATTERN.finditer(value)
+    )
 
 
 def get_secret_value(key: str, default: str = "") -> str:
@@ -264,10 +280,8 @@ def collect_comments(rows: list[dict[str, str]], column: str | None) -> list[str
                 EMAIL_PATTERN,
                 PHONE_PATTERN,
                 URL_PATTERN,
-                HANDLE_PATTERN,
-                CONTACT_LABEL_PATTERN,
             )
-        )
+        ) or contains_personal_handle(value) or contains_contact_assignment(value)
         if normalized in ignored or has_pii:
             continue
         comments.append(value)

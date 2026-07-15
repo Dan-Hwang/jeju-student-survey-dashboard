@@ -78,3 +78,21 @@ Base: `99bbc7f`
 
 - Contact filtering deliberately requires assignment syntax or an identifier-shaped direct value so ordinary Instagram, Kakao, and phone-related prose remains public.
 - Short bare domains are treated as URLs when they include a path; ordinary version-like dotted prose remains allowed.
+
+## Final PII Boundary Fix
+
+Base: `7820be7`
+
+### RED Evidence
+
+- The required table failed on 2 letter-only English social IDs, 3 Korean colon-prose comments, and 3 reserved broadcast handles.
+- The marker-spacing extension separately failed on `Instagram ID jejufriend` and `Kakao account jejufriend`.
+
+### GREEN Evidence
+
+- `PublicCommentPrivacyTest`: 3 tests passed, covering 20 blocked and 16 allowed table cases plus the foreign information-signal regression.
+- Contact assignments now require a supported label, optional marker, delimiter or spacing, and one final identifier token.
+- `@everyone`, `@channel`, and `@here` remain public; other handles remain blocked.
+- Full suite: 48 tests passed, 0 failures.
+- `python -m py_compile src/survey_dashboard.py`: exit 0.
+- `git diff --check`: exit 0 with Windows LF-to-CRLF conversion warnings only.
