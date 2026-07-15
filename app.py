@@ -15,7 +15,17 @@ from reportlab.pdfbase.cidfonts import UnicodeCIDFont
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas
 
+from src.research_brief import (
+    BriefContext,
+    build_brief_context,
+    comparison_html,
+    findings_html,
+    intro_html,
+)
 from src.survey_dashboard import get_foreign_survey, get_public_survey, pct
+
+
+RESEARCH_CSS_PATH = Path(__file__).parent / "assets" / "research-brief.css"
 
 
 def apply_page_style() -> None:
@@ -263,6 +273,10 @@ section[data-testid="stSidebar"] {
 }
 </style>
         """,
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        f"<style>{RESEARCH_CSS_PATH.read_text(encoding='utf-8')}</style>",
         unsafe_allow_html=True,
     )
 
@@ -628,17 +642,31 @@ def field_counter_html(korean_survey: dict[str, object], foreign_survey: dict[st
 """
 
 
-def render_header(korean_survey: dict[str, object], foreign_survey: dict[str, object]) -> None:
-    st.caption("JEJU EXCHANGE SURVEY")
-    st.title("교류학생 생활 플랫폼 수요조사")
-    st.write("한국인·외국인 학생의 이동, 동행 모집, 오픈채팅 이용 수요를 확인합니다.")
-    st.markdown(field_counter_html(korean_survey, foreign_survey), unsafe_allow_html=True)
+def render_header(
+    korean_survey: dict[str, object], foreign_survey: dict[str, object]
+) -> BriefContext:
+    context = build_brief_context(korean_survey, foreign_survey)
+    st.markdown(intro_html(context), unsafe_allow_html=True)
     if korean_survey.get("error"):
-        st.warning(f"{korean_survey['error']}로 인해 한국인 설문은 저장된 CSV 기준 결과를 표시합니다.")
-    elif korean_survey.get("source") != "Google Sheets":
-        st.warning("Google Sheets 연결 전까지 저장된 CSV 기준 결과를 표시합니다.")
+        st.warning(str(korean_survey["error"]))
     if foreign_survey.get("error"):
         st.warning(str(foreign_survey["error"]))
+    return context
+
+
+def render_research_findings(context: BriefContext) -> None:
+    st.markdown(findings_html(context), unsafe_allow_html=True)
+    st.markdown(comparison_html(context), unsafe_allow_html=True)
+
+
+def render_product_bridge(context: BriefContext) -> None:
+    if not context.has_data:
+        return
+    st.markdown(
+        '<section class="research-product-bridge"><p>FROM RESEARCH TO PRODUCT</p>'
+        '<h2>이 근거가 시냅스팟의 두 기능으로 이어졌습니다.</h2></section>',
+        unsafe_allow_html=True,
+    )
 
 
 def render_summary(data: dict[str, object], total: int) -> None:
@@ -1088,7 +1116,7 @@ def render_overall_view(korean_survey: dict[str, object], foreign_survey: dict[s
 
 def render_survey_dashboard() -> None:
     st.set_page_config(
-        page_title="제주대학교 교류학생 생활 플랫폼 수요조사",
+        page_title="교류학생의 이동과 정보 탐색",
         page_icon="📊",
         layout="centered",
     )
@@ -1097,10 +1125,14 @@ def render_survey_dashboard() -> None:
     korean_survey = get_public_survey()
     foreign_survey = get_foreign_survey()
 
-    render_header(korean_survey, foreign_survey)
+    context = render_header(korean_survey, foreign_survey)
     if st.button("데이터 새로고침", use_container_width=True):
         st.cache_data.clear()
         st.rerun()
+
+    render_research_findings(context)
+    render_product_bridge(context)
+    st.markdown("## 상세 조사 결과")
     selected_view = st.radio(
         "보기 선택",
         ["전체 요약", "한국인 설문", "외국인 설문", "비교 요약"],
