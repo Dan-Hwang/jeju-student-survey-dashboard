@@ -38,13 +38,13 @@ def calls_with_text(statement: ast.stmt, name: str, text: str) -> bool:
 class AppCopyTest(unittest.TestCase):
     def setUp(self) -> None:
         self.app_text = Path("app.py").read_text(encoding="utf-8")
-        app_tree = ast.parse(self.app_text)
-        self.dashboard = next(
-            node
-            for node in app_tree.body
+        self.app_tree = ast.parse(self.app_text)
+        self.functions = {
+            node.name: node
+            for node in self.app_tree.body
             if isinstance(node, ast.FunctionDef)
-            and node.name == "render_survey_dashboard"
-        )
+        }
+        self.dashboard = self.functions["render_survey_dashboard"]
 
     def test_research_brief_has_approved_identity(self) -> None:
         self.assertIn("교류학생의 이동과 정보 탐색", self.app_text)
@@ -139,6 +139,139 @@ class AppCopyTest(unittest.TestCase):
         self.assertIn("23명", markup)
         self.assertIn("16명", markup)
         self.assertIn("Google Sheets 실시간 집계", markup)
+
+    def test_overall_rank_sections_use_each_groups_own_total(self) -> None:
+        overall = self.functions["render_overall_view"]
+        rank_calls = [
+            node
+            for node in ast.walk(overall)
+            if isinstance(node, ast.Call) and call_name(node) == "render_rank_section"
+        ]
+        denominator_by_title = {
+            str(call.args[0].value): call.args[3].id
+            for call in rank_calls
+            if len(call.args) == 4
+            and isinstance(call.args[0], ast.Constant)
+            and isinstance(call.args[3], ast.Name)
+        }
+
+        self.assertEqual(
+            denominator_by_title,
+            {
+                "한국인 핵심 불편": "korean_total",
+                "한국인 오픈채팅 수요": "korean_total",
+                "외국인 핵심 불편": "foreign_total",
+                "외국인 오픈채팅 수요": "foreign_total",
+            },
+        )
+        self.assertFalse(
+            any(
+                isinstance(node, ast.Call) and call_name(node) == "max"
+                for node in ast.walk(overall)
+            )
+        )
+
+    def test_overall_view_does_not_repeat_research_conclusion(self) -> None:
+        overall = self.functions["render_overall_view"]
+        copy = {
+            str(node.value)
+            for node in ast.walk(overall)
+            if isinstance(node, ast.Constant) and isinstance(node.value, str)
+        }
+
+        self.assertNotIn("### 한눈에 보는 결론", copy)
+
+    def test_detailed_navigation_keeps_four_views_and_overall_default(self) -> None:
+        radio = next(
+            node
+            for node in ast.walk(self.dashboard)
+            if isinstance(node, ast.Call) and call_name(node) == "st.radio"
+        )
+        options = [
+            str(item.value)
+            for item in radio.args[1].elts
+            if isinstance(item, ast.Constant)
+        ]
+        horizontal = next(
+            keyword.value
+            for keyword in radio.keywords
+            if keyword.arg == "horizontal"
+        )
+
+        self.assertEqual(
+            options,
+            ["전체 요약", "한국인 설문", "외국인 설문", "비교 요약"],
+        )
+        self.assertIsInstance(horizontal, ast.Constant)
+        self.assertIs(horizontal.value, True)
+
+        renderer_if = next(
+            statement
+            for statement in self.dashboard.body
+            if isinstance(statement, ast.If)
+            and {
+                "render_korean_view",
+                "render_foreign_view",
+                "render_compare_view",
+                "render_overall_view",
+            }.issubset(statement_call_names(statement))
+        )
+        final_branch = renderer_if
+        while len(final_branch.orelse) == 1 and isinstance(final_branch.orelse[0], ast.If):
+            final_branch = final_branch.orelse[0]
+        default_calls = {
+            name
+            for statement in final_branch.orelse
+            for name in statement_call_names(statement)
+        }
+        self.assertIn("render_overall_view", default_calls)
+
+    def test_detailed_navigation_wraps_without_truncating_mobile_labels(self) -> None:
+        self.assertIn('div[role="radiogroup"] {', self.app_text)
+        self.assertIn("flex-wrap: wrap;", self.app_text)
+        self.assertIn('div[role="radiogroup"] label {', self.app_text)
+        self.assertIn("min-width: max-content;", self.app_text)
+
+    def test_detailed_renderers_keep_comments_at_five_per_page(self) -> None:
+        for renderer_name in ["render_korean_view", "render_foreign_view"]:
+            renderer_calls = {
+                call_name(node)
+                for node in ast.walk(self.functions[renderer_name])
+                if isinstance(node, ast.Call)
+            }
+            self.assertIn("render_comments_section", renderer_calls)
+
+        comments = self.functions["render_comments_section"]
+        page_size = next(
+            node.value
+            for node in ast.walk(comments)
+            if isinstance(node, ast.Assign)
+            and len(node.targets) == 1
+            and isinstance(node.targets[0], ast.Name)
+            and node.targets[0].id == "page_size"
+        )
+        self.assertIsInstance(page_size, ast.Constant)
+        self.assertEqual(page_size.value, 5)
+        self.assertTrue(calls_with_text(comments, "st.markdown", "## 익명 자유 의견"))
+
+    def test_downloads_expose_only_the_live_pdf_report(self) -> None:
+        downloads = self.functions["render_downloads"]
+        buttons = [
+            node
+            for node in ast.walk(downloads)
+            if isinstance(node, ast.Call) and call_name(node) == "st.download_button"
+        ]
+
+        self.assertEqual(len(buttons), 1)
+        keywords = {keyword.arg: keyword.value for keyword in buttons[0].keywords}
+        self.assertIsInstance(keywords["data"], ast.Call)
+        self.assertEqual(call_name(keywords["data"]), "build_current_pdf")
+        self.assertEqual(keywords["mime"].value, "application/pdf")
+        self.assertEqual(
+            keywords["file_name"].value,
+            "jeju-student-survey-live-report.pdf",
+        )
+        self.assertNotIn("REPORT_PNG", self.app_text)
 
 
 if __name__ == "__main__":

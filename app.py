@@ -140,6 +140,16 @@ section[data-testid="stSidebar"] {
     display: none;
 }
 
+div[role="radiogroup"] {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+div[role="radiogroup"] label {
+    min-width: max-content;
+}
+
 .field-counter {
     overflow: hidden;
     margin: 1rem 0 0.75rem;
@@ -1091,8 +1101,6 @@ def render_overall_view(korean_survey: dict[str, object], foreign_survey: dict[s
     foreign = foreign_survey["data"]
     korean_total = int(korean["n"])
     foreign_total = int(foreign["n"])
-    korean_top_pain = korean["pain"][0] if korean["pain"] else ("-", 0)
-    foreign_top_pain = foreign["pain"][0] if foreign["pain"] else ("-", 0)
     korean_top_openchat = korean["openchat_find"][0] if korean["openchat_find"] else ("-", 0)
     foreign_top_openchat = foreign["openchat_find"][0] if foreign["openchat_find"] else ("-", 0)
 
@@ -1105,16 +1113,33 @@ def render_overall_view(korean_survey: dict[str, object], foreign_survey: dict[s
     ]
     render_html(simple_cards_html(cards), 290)
 
-    with st.container(border=True):
-        st.markdown("### 한눈에 보는 결론")
-        st.write(
-            f"한국인 응답에서는 **{korean_top_pain[0]}**, 외국인 응답에서는 **{foreign_top_pain[0]}** 문제가 크게 보입니다. "
-            f"오픈채팅에서는 한국인 학생은 **{korean_top_openchat[0]}**, 외국인 학생은 **{foreign_top_openchat[0]}**을 많이 찾고 있어요. "
-            "따라서 첫 서비스 검증은 실시간 이동/동행 모집을 중심으로 두고, 외국인 학생에게는 공지/생활정보 탐색을 함께 보강하는 방향이 좋습니다."
-        )
+    st.markdown("### 한국인 응답 상세")
+    render_rank_section(
+        "한국인 핵심 불편",
+        "한국인 응답 기준",
+        korean["pain"],
+        korean_total,
+    )
+    render_rank_section(
+        "한국인 오픈채팅 수요",
+        "한국인 응답 기준",
+        korean["openchat_find"],
+        korean_total,
+    )
 
-    render_rank_section("전체 핵심 불편", "한국인/외국인 1순위 비교", [("한국인: " + str(korean_top_pain[0]), korean_top_pain[1]), ("외국인: " + str(foreign_top_pain[0]), foreign_top_pain[1])], max(korean_total, foreign_total))
-    render_rank_section("전체 오픈채팅 수요", "한국인/외국인 1순위 비교", [("한국인: " + str(korean_top_openchat[0]), korean_top_openchat[1]), ("외국인: " + str(foreign_top_openchat[0]), foreign_top_openchat[1])], max(korean_total, foreign_total))
+    st.markdown("### 외국인 응답 상세")
+    render_rank_section(
+        "외국인 핵심 불편",
+        "외국인 응답 기준",
+        foreign["pain"],
+        foreign_total,
+    )
+    render_rank_section(
+        "외국인 오픈채팅 수요",
+        "외국인 응답 기준",
+        foreign["openchat_find"],
+        foreign_total,
+    )
 
 
 def render_survey_dashboard() -> None:
