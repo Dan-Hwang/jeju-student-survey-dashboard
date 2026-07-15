@@ -98,6 +98,15 @@ class AppCopyTest(unittest.TestCase):
             ],
         )
 
+    def test_dashboard_renders_product_bridge_exactly_once(self) -> None:
+        bridge_calls = [
+            node
+            for node in ast.walk(self.dashboard)
+            if isinstance(node, ast.Call) and call_name(node) == "render_product_bridge"
+        ]
+
+        self.assertEqual(len(bridge_calls), 1)
+
     def test_presentation_gimmicks_are_not_present(self) -> None:
         hidden_terms = [
             "발표 주제 선택",

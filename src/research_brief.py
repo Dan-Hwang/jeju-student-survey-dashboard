@@ -3,8 +3,11 @@ from __future__ import annotations
 from base64 import b64encode
 from dataclasses import dataclass
 from html import escape
+from io import BytesIO
 from pathlib import Path
 from typing import Any, Iterable
+
+from PIL import Image
 
 
 @dataclass(frozen=True)
@@ -167,9 +170,13 @@ def image_data_uri(path: Path) -> str:
         return ""
     try:
         image_bytes = path.read_bytes()
-    except OSError:
-        return ""
-    if not image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+        with Image.open(BytesIO(image_bytes)) as image:
+            if image.format != "PNG":
+                return ""
+            image.verify()
+        with Image.open(BytesIO(image_bytes)) as image:
+            image.load()
+    except (OSError, SyntaxError, ValueError, Image.DecompressionBombError):
         return ""
     encoded = b64encode(image_bytes).decode("ascii")
     return f"data:image/png;base64,{encoded}"

@@ -1,5 +1,6 @@
 import re
 import unittest
+from base64 import b64decode
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
@@ -11,6 +12,12 @@ from src.research_brief import (
     intro_html,
     product_bridge_html,
     ranked_metrics,
+)
+
+
+VALID_TINY_PNG = b64decode(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk"
+    "+A8AAQUBAScY42YAAAAASUVORK5CYII="
 )
 
 
@@ -138,12 +145,12 @@ class ProductBridgeTest(unittest.TestCase):
     def test_png_is_encoded_as_data_uri(self):
         with TemporaryDirectory() as directory:
             path = Path(directory) / "screen.png"
-            path.write_bytes(b"\x89PNG\r\n\x1a\nexample")
+            path.write_bytes(VALID_TINY_PNG)
 
             uri = image_data_uri(path)
 
         self.assertTrue(uri.startswith("data:image/png;base64,"))
-        self.assertNotIn("example", uri)
+        self.assertEqual(b64decode(uri.partition(",")[2]), VALID_TINY_PNG)
 
     def test_non_png_path_is_not_embedded(self):
         with TemporaryDirectory() as directory:
@@ -161,12 +168,27 @@ class ProductBridgeTest(unittest.TestCase):
         self.assertIn("근거 있는 정보 탐색", markup)
         self.assertNotIn("<img", markup)
 
+    def test_corrupt_png_keeps_feature_copy_without_broken_image(self):
+        with TemporaryDirectory() as directory:
+            corrupt = Path(directory) / "corrupt.png"
+            corrupt.write_bytes(VALID_TINY_PNG[:20])
+
+            markup = product_bridge_html(
+                self.context, corrupt, Path(directory) / "missing.png"
+            )
+            uri = image_data_uri(corrupt)
+
+        self.assertEqual(uri, "")
+        self.assertIn("이동·동행 파티", markup)
+        self.assertIn("근거 있는 정보 탐색", markup)
+        self.assertNotIn("<img", markup)
+
     def test_bridge_is_rendered_once_with_restrained_research_claim(self):
         with TemporaryDirectory() as directory:
             meetings = Path(directory) / "meetings.png"
             question = Path(directory) / "question.png"
-            meetings.write_bytes(b"\x89PNG\r\n\x1a\nmeetings")
-            question.write_bytes(b"\x89PNG\r\n\x1a\nquestion")
+            meetings.write_bytes(VALID_TINY_PNG)
+            question.write_bytes(VALID_TINY_PNG)
 
             markup = product_bridge_html(self.context, meetings, question)
 
@@ -242,3 +264,20 @@ class ResearchBriefCssTest(unittest.TestCase):
             value_without_tokens = token_pattern.sub("", value)
             remaining_words = set(re.findall(r"[A-Za-z]+", value_without_tokens))
             self.assertLessEqual(remaining_words, allowed_non_color_words)
+
+    def test_stylesheet_limits_radii_and_omits_hover_selectors(self):
+        stylesheet = (
+            Path(__file__).resolve().parents[1] / "assets" / "research-brief.css"
+        ).read_text(encoding="utf-8")
+        radii = [
+            float(value)
+            for value in re.findall(
+                r"border-radius\s*:\s*([0-9]+(?:\.[0-9]+)?)px",
+                stylesheet,
+                flags=re.IGNORECASE,
+            )
+        ]
+
+        self.assertTrue(radii)
+        self.assertLessEqual(max(radii), 8)
+        self.assertNotRegex(stylesheet, r"(?i):hover\b")
