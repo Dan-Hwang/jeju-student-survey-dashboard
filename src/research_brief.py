@@ -46,24 +46,6 @@ SOURCE_NAMES = {
     "empty": "데이터 없음",
 }
 
-MOVEMENT_PAIN_LABELS = {
-    "교통",
-    "버스 노선",
-    "택시비",
-    "같이 이동할 사람 찾기",
-    "여행 계획",
-}
-OPENCHAT_PAIN_LABELS = {
-    "원하는 글 찾기 어렵다",
-    "글이 너무 많다",
-    "지난 글 찾기 어렵다",
-    "검색 기능 불편",
-    "정보 정확성 모르겠다",
-    "채팅이 빨리 올라간다",
-    "모집 종료 글 노출",
-}
-
-
 def percent_text(value: int, total: int) -> str:
     if total <= 0:
         return "0%"
@@ -88,9 +70,9 @@ def _group(label: str, survey: dict[str, Any]) -> GroupBrief:
     return GroupBrief(
         label=label,
         total=total,
-        pain=ranked_metrics(data.get("pain", []), total),
-        openchat_find=ranked_metrics(data.get("openchat_find", []), total),
-        openchat_pain=ranked_metrics(data.get("openchat_pain", []), total),
+        pain=ranked_metrics(data.get("pain", []), total, limit=None),
+        openchat_find=ranked_metrics(data.get("openchat_find", []), total, limit=None),
+        openchat_pain=ranked_metrics(data.get("openchat_pain", []), total, limit=None),
     )
 
 
@@ -139,16 +121,10 @@ def build_brief_context(
 def _problem_rows(
     groups: tuple[tuple[GroupBrief, str], ...],
     metric_name: str,
-    labels: set[str],
-    limit: int = 2,
 ) -> str:
     group_sections: list[str] = []
     for group, accent in groups:
-        metrics = [
-            metric
-            for metric in getattr(group, metric_name)
-            if metric.label in labels
-        ][:limit]
+        metrics = getattr(group, metric_name)
         if not metrics:
             continue
         rows = []
@@ -201,10 +177,10 @@ def conclusion_html(context: BriefContext) -> str:
 def findings_html(context: BriefContext) -> str:
     groups = ((context.korean, "korean"), (context.foreign, "foreign"))
     return f'''<section class="research-section">
-  <div class="research-heading"><h2>응답이 가리킨 두 가지 문제</h2><span>동일 문항 · 집단 내 비율</span></div>
+  <div class="research-heading"><h2>두 설문에서 확인된 핵심 불편</h2><span>전체 응답 항목 · 집단 내 비율</span></div>
   <div class="research-two-column">
-    <article class="research-signal korean"><p>PROBLEM 01 · 이동 경험</p><h3>이동 환경의 불편</h3><div class="research-question">Q. 제주에서 가장 불편했던 점</div>{_problem_rows(groups, "pain", MOVEMENT_PAIN_LABELS)}</article>
-    <article class="research-signal foreign"><p>PROBLEM 02 · 오픈채팅 경험</p><h3>필요한 글을 찾기 어려움</h3><div class="research-question">Q. 오픈채팅에서 가장 불편한 점</div>{_problem_rows(groups, "openchat_pain", OPENCHAT_PAIN_LABELS)}</article>
+    <article class="research-signal korean"><p>PROBLEM 01 · 제주 생활</p><h3>제주 생활에서 불편했던 점</h3><div class="research-question">Q. 제주에서 가장 불편했던 점</div>{_problem_rows(groups, "pain")}</article>
+    <article class="research-signal foreign"><p>PROBLEM 02 · 오픈채팅</p><h3>오픈채팅에서 불편했던 점</h3><div class="research-question">Q. 오픈채팅에서 가장 불편한 점</div>{_problem_rows(groups, "openchat_pain")}</article>
   </div>
 </section>'''
 

@@ -36,14 +36,14 @@
 .research-chart-group-heading strong { color: var(--research-coral); font-size: 14px; }
 .research-chart-group.foreign .research-chart-group-heading strong { color: var(--research-teal); }
 .research-chart-group-heading span { color: var(--research-muted); font-size: 11px; }
-.research-bar-row { display: grid; grid-template-columns: minmax(100px, .8fr) 1.2fr 92px; gap: 10px; align-items: center; margin: 11px 0; }
+.research-bar-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; align-items: center; margin: 13px 0; }
 .research-bar-label { color: var(--research-navy); font-size: 13px; }
-.research-bar-track { overflow: hidden; height: 10px; border-radius: 3px; background: var(--research-line); }
+.research-bar-track { grid-column: 1 / -1; overflow: hidden; height: 10px; border-radius: 3px; background: var(--research-line); }
 .research-bar-fill { display: block; height: 100%; background: var(--research-coral); }
 .research-bar-fill.foreign { background: var(--research-teal); }
 .research-bar-row strong { text-align: right; font-size: 13px; }
 .research-bar-row small { color: var(--research-muted); font-weight: 500; }
-.research-axis { display: grid; grid-template-columns: minmax(100px, .8fr) 1.2fr 92px; gap: 10px; margin-top: 6px; }
+.research-axis { margin-top: 6px; }
 .research-axis-scale { display: flex; justify-content: space-between; color: var(--research-muted); font-size: 10px; }
 .research-compare { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 18px; }
 .research-compare > div { padding: 16px; border: 1px solid var(--research-line); border-radius: 8px; background: var(--research-bg); }
@@ -77,7 +77,7 @@
   .research-section h2 { font-size: 23px; }
   .research-two-column, .research-compare { grid-template-columns: 1fr; }
   .research-heading { align-items: start; flex-direction: column; }
-  .research-bar-row, .research-axis { grid-template-columns: 92px 1fr 76px; gap: 8px; }
+  .research-bar-row { gap: 5px 10px; }
   .research-bar-label { font-size: 12px; }
   .research-bar-row strong { font-size: 12px; }
   .research-product-bridge { padding: 26px 16px; }

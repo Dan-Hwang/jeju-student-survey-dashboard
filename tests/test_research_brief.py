@@ -136,7 +136,7 @@ class ResearchBriefHtmlTest(unittest.TestCase):
         self.assertIn("교통", markup)
         self.assertIn("66.7%", markup)
 
-    def test_findings_compare_only_matching_survey_questions(self):
+    def test_findings_show_every_response_item_for_each_question(self):
         korean = survey(
             10,
             source="Google Sheets",
@@ -155,26 +155,47 @@ class ResearchBriefHtmlTest(unittest.TestCase):
         )
 
         markup = findings_html(build_brief_context(korean, foreign))
-        movement = markup.split("이동 환경의 불편", 1)[1].split("필요한 글을 찾기 어려움", 1)[0]
-        information = markup.split("필요한 글을 찾기 어려움", 1)[1]
+        living = markup.split("제주 생활에서 불편했던 점", 1)[1].split(
+            "오픈채팅에서 불편했던 점", 1
+        )[0]
+        openchat = markup.split("오픈채팅에서 불편했던 점", 1)[1]
 
-        for expected in ["한국인", "외국인", "버스 노선", "교통"]:
-            self.assertIn(expected, movement)
-        for excluded in ["정보 부족", "택시팟", "여행팟", "공지", "생활정보", "검색 기능 불편"]:
-            self.assertNotIn(excluded, movement)
+        for expected in ["한국인", "외국인", "버스 노선", "정보 부족", "교통"]:
+            self.assertIn(expected, living)
+        for excluded in ["택시팟", "여행팟", "공지", "생활정보", "검색 기능 불편"]:
+            self.assertNotIn(excluded, living)
         for expected in ["한국인", "외국인", "원하는 글 찾기 어렵다", "검색 기능 불편"]:
-            self.assertIn(expected, information)
-        for excluded in ["버스 노선", "교통", "택시팟", "여행팟", "정보 부족", "공지", "생활정보"]:
-            self.assertNotIn(excluded, information)
-        self.assertIn("9명 <small>90.0%</small>", movement)
-        self.assertIn("2명 <small>50.0%</small>", movement)
-        self.assertIn("3명 <small>30.0%</small>", information)
-        self.assertIn("2명 <small>50.0%</small>", information)
+            self.assertIn(expected, openchat)
+        for excluded in ["버스 노선", "교통", "정보 부족", "택시팟", "여행팟", "공지", "생활정보"]:
+            self.assertNotIn(excluded, openchat)
+        self.assertIn("9명 <small>90.0%</small>", living)
+        self.assertIn("1명 <small>10.0%</small>", living)
+        self.assertIn("2명 <small>50.0%</small>", living)
+        self.assertIn("3명 <small>30.0%</small>", openchat)
+        self.assertIn("2명 <small>50.0%</small>", openchat)
+
+    def test_findings_do_not_cut_questions_to_the_top_two_items(self):
+        korean = survey(
+            10,
+            source="Google Sheets",
+            loaded_at="2026-07-15 15:00",
+            pain=[("교통", 5), ("택시비", 4), ("정보 부족", 3), ("식사", 2)],
+            openchat_pain=[
+                ("글이 너무 많다", 5),
+                ("원하는 글 찾기 어렵다", 4),
+                ("지난 글 찾기 어렵다", 3),
+            ],
+        )
+
+        markup = findings_html(build_brief_context(korean, self.foreign))
+
+        for expected in ["교통", "택시비", "정보 부족", "식사", "지난 글 찾기 어렵다"]:
+            self.assertIn(expected, markup)
 
     def test_findings_label_question_source_and_shared_percentage_scale(self):
         markup = findings_html(self.context)
 
-        self.assertIn("동일 문항 · 집단 내 비율", markup)
+        self.assertIn("전체 응답 항목 · 집단 내 비율", markup)
         self.assertIn("Q. 제주에서 가장 불편했던 점", markup)
         self.assertIn("Q. 오픈채팅에서 가장 불편한 점", markup)
         self.assertEqual(markup.count('class="research-axis"'), 2)
@@ -219,7 +240,7 @@ class ResearchBriefHtmlTest(unittest.TestCase):
         self.assertNotIn("<strong>택시팟</strong>", markup)
         self.assertNotIn("<b>source</b>", markup)
         self.assertNotIn("<time>", markup)
-        self.assertNotIn("alert(1)", markup)
+        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", markup)
         self.assertIn("&lt;strong&gt;택시팟&lt;/strong&gt;", markup)
         self.assertIn("&lt;b&gt;source&lt;/b&gt;", markup)
         self.assertIn("&lt;time&gt;", markup)
