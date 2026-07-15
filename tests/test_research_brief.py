@@ -136,7 +136,7 @@ class ResearchBriefHtmlTest(unittest.TestCase):
         self.assertIn("교통", markup)
         self.assertIn("66.7%", markup)
 
-    def test_findings_group_metrics_by_problem_across_both_populations(self):
+    def test_findings_compare_only_matching_survey_questions(self):
         korean = survey(
             10,
             source="Google Sheets",
@@ -155,28 +155,30 @@ class ResearchBriefHtmlTest(unittest.TestCase):
         )
 
         markup = findings_html(build_brief_context(korean, foreign))
-        movement = markup.split("이동과 동행 모집", 1)[1].split("공지와 생활정보 탐색", 1)[0]
-        information = markup.split("공지와 생활정보 탐색", 1)[1]
+        movement = markup.split("이동 환경의 불편", 1)[1].split("필요한 글을 찾기 어려움", 1)[0]
+        information = markup.split("필요한 글을 찾기 어려움", 1)[1]
 
-        for expected in ["한국인", "외국인", "버스 노선", "교통", "택시팟", "여행팟"]:
+        for expected in ["한국인", "외국인", "버스 노선", "교통"]:
             self.assertIn(expected, movement)
-        for excluded in ["정보 부족", "공지", "생활정보", "검색 기능 불편"]:
+        for excluded in ["정보 부족", "택시팟", "여행팟", "공지", "생활정보", "검색 기능 불편"]:
             self.assertNotIn(excluded, movement)
-        for expected in [
-            "한국인",
-            "외국인",
-            "정보 부족",
-            "공지",
-            "생활정보",
-            "원하는 글 찾기 어렵다",
-            "검색 기능 불편",
-        ]:
+        for expected in ["한국인", "외국인", "원하는 글 찾기 어렵다", "검색 기능 불편"]:
             self.assertIn(expected, information)
-        for excluded in ["버스 노선", "교통", "택시팟", "여행팟"]:
+        for excluded in ["버스 노선", "교통", "택시팟", "여행팟", "정보 부족", "공지", "생활정보"]:
             self.assertNotIn(excluded, information)
         self.assertIn("9명 <small>90.0%</small>", movement)
         self.assertIn("2명 <small>50.0%</small>", movement)
-        self.assertIn("4명 <small>100.0%</small>", information)
+        self.assertIn("3명 <small>30.0%</small>", information)
+        self.assertIn("2명 <small>50.0%</small>", information)
+
+    def test_findings_label_question_source_and_shared_percentage_scale(self):
+        markup = findings_html(self.context)
+
+        self.assertIn("동일 문항 · 집단 내 비율", markup)
+        self.assertIn("Q. 제주에서 가장 불편했던 점", markup)
+        self.assertIn("Q. 오픈채팅에서 가장 불편한 점", markup)
+        self.assertEqual(markup.count('class="research-axis"'), 2)
+        self.assertEqual(markup.count("<span>0%</span><span>50%</span><span>100%</span>"), 2)
 
     def test_comparison_shows_top_signal_count_and_group_percentage(self):
         markup = comparison_html(self.context)

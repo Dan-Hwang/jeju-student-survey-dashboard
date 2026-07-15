@@ -46,26 +46,21 @@ SOURCE_NAMES = {
     "empty": "데이터 없음",
 }
 
-MOVEMENT_LABELS = {
+MOVEMENT_PAIN_LABELS = {
     "교통",
     "버스 노선",
     "택시비",
     "같이 이동할 사람 찾기",
     "여행 계획",
-    "택시팟",
-    "여행팟",
 }
-INFORMATION_LABELS = {
-    "정보 부족",
-    "공지",
-    "생활정보",
-    "시험정보",
+OPENCHAT_PAIN_LABELS = {
     "원하는 글 찾기 어렵다",
     "글이 너무 많다",
     "지난 글 찾기 어렵다",
     "검색 기능 불편",
     "정보 정확성 모르겠다",
     "채팅이 빨리 올라간다",
+    "모집 종료 글 노출",
 }
 
 
@@ -142,28 +137,40 @@ def build_brief_context(
 
 
 def _problem_rows(
-    groups: tuple[tuple[GroupBrief, str], ...], labels: set[str]
+    groups: tuple[tuple[GroupBrief, str], ...],
+    metric_name: str,
+    labels: set[str],
+    limit: int = 2,
 ) -> str:
-    selected: list[tuple[str, RankedMetric, str]] = []
+    group_sections: list[str] = []
     for group, accent in groups:
-        seen: set[str] = set()
-        for metric in (*group.pain, *group.openchat_find, *group.openchat_pain):
-            if metric.label in labels and metric.label not in seen:
-                selected.append((group.label, metric, accent))
-                seen.add(metric.label)
-    if not selected:
-        return '<p class="research-empty">아직 표시할 응답이 없습니다.</p>'
-    rows = []
-    for group_label, metric, accent in selected:
-        width = min(100.0, float(metric.percent.rstrip("%") or 0))
-        rows.append(
-            f'''<div class="research-bar-row">
-  <span class="research-bar-label">{escape(group_label)} · {escape(metric.label)}</span>
+        metrics = [
+            metric
+            for metric in getattr(group, metric_name)
+            if metric.label in labels
+        ][:limit]
+        if not metrics:
+            continue
+        rows = []
+        for metric in metrics:
+            width = min(100.0, float(metric.percent.rstrip("%") or 0))
+            rows.append(
+                f'''<div class="research-bar-row">
+  <span class="research-bar-label">{escape(metric.label)}</span>
   <span class="research-bar-track"><span class="research-bar-fill {accent}" style="width:{width:.1f}%"></span></span>
   <strong>{metric.count}명 <small>{metric.percent}</small></strong>
 </div>'''
+            )
+        group_sections.append(
+            f'''<div class="research-chart-group {accent}">
+  <div class="research-chart-group-heading"><strong>{escape(group.label)}</strong><span>n={group.total}</span></div>
+  {''.join(rows)}
+</div>'''
         )
-    return "\n".join(rows)
+    if not group_sections:
+        return '<p class="research-empty">아직 표시할 응답이 없습니다.</p>'
+    return "\n".join(group_sections) + '''
+<div class="research-axis" aria-hidden="true"><span></span><div class="research-axis-scale"><span>0%</span><span>50%</span><span>100%</span></div><span></span></div>'''
 
 
 def intro_html(context: BriefContext) -> str:
@@ -194,10 +201,10 @@ def conclusion_html(context: BriefContext) -> str:
 def findings_html(context: BriefContext) -> str:
     groups = ((context.korean, "korean"), (context.foreign, "foreign"))
     return f'''<section class="research-section">
-  <div class="research-heading"><h2>응답이 가리킨 두 가지 문제</h2><span>복수 응답 · 집단 내 비율</span></div>
+  <div class="research-heading"><h2>응답이 가리킨 두 가지 문제</h2><span>동일 문항 · 집단 내 비율</span></div>
   <div class="research-two-column">
-    <article class="research-signal korean"><p>PROBLEM 01 · 두 집단의 이동 경험</p><h3>이동과 동행 모집</h3>{_problem_rows(groups, MOVEMENT_LABELS)}</article>
-    <article class="research-signal foreign"><p>PROBLEM 02 · 두 집단의 정보 경험</p><h3>공지와 생활정보 탐색</h3>{_problem_rows(groups, INFORMATION_LABELS)}</article>
+    <article class="research-signal korean"><p>PROBLEM 01 · 이동 경험</p><h3>이동 환경의 불편</h3><div class="research-question">Q. 제주에서 가장 불편했던 점</div>{_problem_rows(groups, "pain", MOVEMENT_PAIN_LABELS)}</article>
+    <article class="research-signal foreign"><p>PROBLEM 02 · 오픈채팅 경험</p><h3>필요한 글을 찾기 어려움</h3><div class="research-question">Q. 오픈채팅에서 가장 불편한 점</div>{_problem_rows(groups, "openchat_pain", OPENCHAT_PAIN_LABELS)}</article>
   </div>
 </section>'''
 
