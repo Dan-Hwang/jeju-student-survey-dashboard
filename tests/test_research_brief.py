@@ -1,4 +1,6 @@
+import re
 import unittest
+from pathlib import Path
 
 from src.research_brief import build_brief_context, ranked_metrics
 from src.research_brief import comparison_html, findings_html, intro_html
@@ -117,3 +119,61 @@ class ResearchBriefHtmlTest(unittest.TestCase):
         self.assertIn("&lt;strong&gt;택시팟&lt;/strong&gt;", markup)
         self.assertIn("&lt;b&gt;source&lt;/b&gt;", markup)
         self.assertIn("&lt;time&gt;", markup)
+
+
+class ResearchBriefCssTest(unittest.TestCase):
+    def test_stylesheet_uses_only_the_approved_palette(self):
+        stylesheet = (
+            Path(__file__).resolve().parents[1] / "assets" / "research-brief.css"
+        ).read_text(encoding="utf-8")
+        approved_colors = {
+            "#13233D",
+            "#087F72",
+            "#EC6A5F",
+            "#FBFCFD",
+            "#D8E2E9",
+            "#66768A",
+            "#132E50",
+        }
+        approved_tokens = {
+            "navy",
+            "teal",
+            "coral",
+            "bg",
+            "line",
+            "muted",
+            "bridge",
+        }
+
+        literal_colors = {
+            match.group(0).upper()
+            for match in re.finditer(
+                r"#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|"
+                r"[0-9a-fA-F]{4}|[0-9a-fA-F]{3})(?![0-9a-fA-F])",
+                stylesheet,
+            )
+        }
+        self.assertEqual(literal_colors, approved_colors)
+
+        declaration_pattern = re.compile(
+            r"(?P<property>background(?:-color)?|color|"
+            r"border(?:-(?:top|right|bottom|left))?(?:-color)?|"
+            r"(?:box|text)-shadow|outline(?:-color)?|fill|stroke|"
+            r"(?:accent|caret)-color|column-rule(?:-color)?|"
+            r"text-decoration(?:-color)?)"
+            r"\s*:\s*(?P<value>[^;{}]+)",
+            re.IGNORECASE,
+        )
+        token_pattern = re.compile(
+            r"var\(--research-(?:" + "|".join(sorted(approved_tokens)) + r")\)"
+        )
+        allowed_non_color_words = {"inset", "none", "px", "solid"}
+
+        for declaration in declaration_pattern.finditer(stylesheet):
+            value = declaration.group("value").strip()
+            if value == "0":
+                continue
+            self.assertRegex(value, token_pattern)
+            value_without_tokens = token_pattern.sub("", value)
+            remaining_words = set(re.findall(r"[A-Za-z]+", value_without_tokens))
+            self.assertLessEqual(remaining_words, allowed_non_color_words)
