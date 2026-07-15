@@ -50,7 +50,7 @@ html, body, [data-testid="stAppViewContainer"], .stApp {
 }
 
 .main .block-container {
-    max-width: 880px;
+    max-width: 1120px;
     padding: 1rem 1rem 4rem;
 }
 
@@ -397,14 +397,33 @@ body {
 
 .bar-list {
     display: grid;
-    gap: 14px;
+    gap: 0;
+}
+
+.bar-axis {
+    margin: 0 0 4px;
+}
+
+.bar-axis-scale {
+    display: flex;
+    justify-content: space-between;
+    color: var(--chart-muted);
+    font-size: 11px;
+    font-weight: 700;
 }
 
 .bar-row {
-    display: grid;
-    grid-template-columns: minmax(108px, 170px) 1fr minmax(86px, auto);
+    min-height: 68px;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--chart-line);
+}
+
+.bar-row-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
     gap: 12px;
-    align-items: center;
+    margin-bottom: 8px;
 }
 
 .bar-label {
@@ -422,9 +441,12 @@ body {
 
 .bar-fill {
     height: 100%;
-    min-width: 9px;
     border-radius: 3px;
     background: var(--chart-teal);
+}
+
+.chart-foreign .bar-fill {
+    background: var(--chart-coral);
 }
 
 .bar-value {
@@ -432,6 +454,43 @@ body {
     font-size: 13px;
     font-weight: 800;
     text-align: right;
+    white-space: nowrap;
+}
+
+.comparison-chart-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+    margin: 12px 0 26px;
+}
+
+.comparison-chart-panel {
+    min-width: 0;
+    border-top: 4px solid var(--chart-teal);
+}
+
+.comparison-chart-panel.chart-foreign {
+    border-top-color: var(--chart-coral);
+}
+
+.comparison-chart-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.comparison-chart-heading strong {
+    color: var(--chart-navy);
+    font-size: 17px;
+    font-weight: 900;
+}
+
+.comparison-chart-heading span {
+    color: var(--chart-muted);
+    font-size: 12px;
+    font-weight: 800;
     white-space: nowrap;
 }
 
@@ -506,13 +565,17 @@ body {
         padding: 14px;
     }
 
-    .bar-row {
+    .comparison-chart-grid {
         grid-template-columns: 1fr;
-        gap: 6px;
+        gap: 16px;
+    }
+
+    .bar-label {
+        font-size: 13px;
     }
 
     .bar-value {
-        text-align: left;
+        font-size: 11px;
     }
 
 }
@@ -558,24 +621,77 @@ def simple_cards_html(cards: list[tuple[str, str, str]]) -> str:
     return f"{chart_theme()}<section class='summary-grid'>{card_markup}</section>"
 
 
-def bar_chart_html(items: list[tuple[str, int]], total: int) -> str:
-    if not items:
-        return f"{chart_theme()}<section class='chart-card'>아직 표시할 응답이 없습니다.</section>"
-
-    max_value = max(value for _, value in items) or 1
+def bar_rows_html(items: list[tuple[str, int]], total: int) -> str:
     rows = []
     for label, value in items:
-        width = max(3, round(value / max_value * 100))
+        width = value / total * 100 if total else 0
         rows.append(
             f"""
 <div class="bar-row">
-    <div class="bar-label">{escape(label)}</div>
-    <div class="bar-track"><div class="bar-fill" style="width:{width}%"></div></div>
-    <div class="bar-value">{value}명 · {pct(value, total)}</div>
+    <div class="bar-row-head">
+        <div class="bar-label">{escape(label)}</div>
+        <div class="bar-value">{value}명 · {pct(value, total)}</div>
+    </div>
+    <div class="bar-track"><div class="bar-fill" style="width:{width:.1f}%"></div></div>
 </div>
 """
         )
-    return f"{chart_theme()}<section class='chart-card'><div class='bar-list'>{''.join(rows)}</div></section>"
+    return "".join(rows)
+
+
+def bar_axis_html() -> str:
+    return """
+<div class="bar-axis" aria-hidden="true">
+    <div class="bar-axis-scale"><span>0%</span><span>50%</span><span>100%</span></div>
+</div>
+"""
+
+
+def bar_chart_html(
+    items: list[tuple[str, int]], total: int, tone: str = "korean"
+) -> str:
+    if not items:
+        return f"{chart_theme()}<section class='chart-card'>아직 표시할 응답이 없습니다.</section>"
+
+    tone_class = "chart-foreign" if tone == "foreign" else "chart-korean"
+    return (
+        f"{chart_theme()}<section class='chart-card {tone_class}'>"
+        f"{bar_axis_html()}<div class='bar-list'>{bar_rows_html(items, total)}</div>"
+        "</section>"
+    )
+
+
+def comparison_chart_html(
+    korean_items: list[tuple[str, int]],
+    foreign_items: list[tuple[str, int]],
+    korean_total: int,
+    foreign_total: int,
+) -> str:
+    def panel(
+        label: str, items: list[tuple[str, int]], total: int, tone: str
+    ) -> str:
+        rows = (
+            f"{bar_axis_html()}<div class='bar-list'>{bar_rows_html(items, total)}</div>"
+            if items
+            else "<p>아직 표시할 응답이 없습니다.</p>"
+        )
+        return f"""
+<article class="chart-card comparison-chart-panel chart-{tone}">
+    <div class="comparison-chart-heading">
+        <strong>{label} 응답 · n={total}</strong>
+        <span>집단 내 비율</span>
+    </div>
+    {rows}
+</article>
+"""
+
+    return f"""
+{chart_theme()}
+<section class="comparison-chart-grid">
+    {panel("한국인", korean_items, korean_total, "korean")}
+    {panel("외국인", foreign_items, foreign_total, "foreign")}
+</section>
+"""
 
 
 def intent_chart_html(intent: list[tuple[str, int]], total: int) -> str:
@@ -734,11 +850,38 @@ def render_foreign_summary(data: dict[str, object], total: int) -> None:
             st.write("아직 표시할 응답이 없습니다.")
 
 
-def render_rank_section(title: str, subtitle: str, items: list[tuple[str, int]], total: int) -> None:
+def render_rank_section(
+    title: str,
+    subtitle: str,
+    items: list[tuple[str, int]],
+    total: int,
+    tone: str = "korean",
+) -> None:
     st.markdown(f"## {title}")
     st.caption(subtitle)
-    height = 124 + max(1, len(items)) * 72
-    render_html(bar_chart_html(items, total), height)
+    height = 112 + max(1, len(items)) * 70
+    render_html(bar_chart_html(items, total, tone), height)
+
+
+def render_comparison_section(
+    title: str,
+    subtitle: str,
+    korean_items: list[tuple[str, int]],
+    foreign_items: list[tuple[str, int]],
+    korean_total: int,
+    foreign_total: int,
+) -> None:
+    st.markdown(f"## {title}")
+    st.caption(subtitle)
+    st.markdown(
+        comparison_chart_html(
+            korean_items,
+            foreign_items,
+            korean_total,
+            foreign_total,
+        ),
+        unsafe_allow_html=True,
+    )
 
 
 def render_intent_section(intent: list[tuple[str, int]], total: int) -> None:
@@ -815,11 +958,11 @@ def render_foreign_view(survey: dict[str, object]) -> None:
     data = survey["data"]
     total = int(data["n"])
     render_foreign_summary(data, total)
-    render_rank_section("제주에서 불편했던 점", "외국인 설문 · 복수 응답", data["pain"], total)
-    render_rank_section("택시 이용 빈도", "외국인 설문 · 단일 응답", data["taxi_frequency"], total)
-    render_rank_section("같이 하고 싶은 활동", "외국인 설문 · 복수 응답", data["activity"], total)
-    render_rank_section("오픈채팅에서 찾는 정보", "외국인 설문 · 복수 응답", data["openchat_find"], total)
-    render_rank_section("오픈채팅에서 불편한 점", "외국인 설문 · 복수 응답", data["openchat_pain"], total)
+    render_rank_section("제주에서 불편했던 점", "외국인 설문 · 복수 응답", data["pain"], total, "foreign")
+    render_rank_section("택시 이용 빈도", "외국인 설문 · 단일 응답", data["taxi_frequency"], total, "foreign")
+    render_rank_section("같이 하고 싶은 활동", "외국인 설문 · 복수 응답", data["activity"], total, "foreign")
+    render_rank_section("오픈채팅에서 찾는 정보", "외국인 설문 · 복수 응답", data["openchat_find"], total, "foreign")
+    render_rank_section("오픈채팅에서 불편한 점", "외국인 설문 · 복수 응답", data["openchat_pain"], total, "foreign")
     render_intent_section(data["intent"], total)
     render_comments_section(data.get("comments", []), "foreign")
 
@@ -853,10 +996,22 @@ def render_compare_view(korean_survey: dict[str, object], foreign_survey: dict[s
             "초기 서비스는 실시간 이동/동행 모집과 신뢰 가능한 정보 정리를 함께 보여주는 방향이 적합합니다."
         )
 
-    render_rank_section("한국인 설문: 불편했던 점", "비교용", korean["pain"], korean_total)
-    render_rank_section("외국인 설문: 불편했던 점", "비교용", foreign["pain"], foreign_total)
-    render_rank_section("한국인 설문: 오픈채팅에서 찾는 것", "비교용", korean["openchat_find"], korean_total)
-    render_rank_section("외국인 설문: 오픈채팅에서 찾는 정보", "비교용", foreign["openchat_find"], foreign_total)
+    render_comparison_section(
+        "제주에서 불편했던 점",
+        "전체 응답 · 복수 응답 · 집단별 0~100% 기준",
+        korean["pain"],
+        foreign["pain"],
+        korean_total,
+        foreign_total,
+    )
+    render_comparison_section(
+        "오픈채팅에서 찾는 정보",
+        "전체 응답 · 집단별 0~100% 기준",
+        korean["openchat_find"],
+        foreign["openchat_find"],
+        korean_total,
+        foreign_total,
+    )
 
 
 def render_overall_view(korean_survey: dict[str, object], foreign_survey: dict[str, object]) -> None:
@@ -876,31 +1031,20 @@ def render_overall_view(korean_survey: dict[str, object], foreign_survey: dict[s
     ]
     render_html(simple_cards_html(cards), 290)
 
-    st.markdown("### 한국인 응답 상세")
-    render_rank_section(
-        "한국인 핵심 불편",
-        "한국인 응답 기준",
+    render_comparison_section(
+        "제주에서 불편했던 점",
+        "전체 응답 · 복수 응답 · 집단별 0~100% 기준",
         korean["pain"],
-        korean_total,
-    )
-    render_rank_section(
-        "한국인 오픈채팅 수요",
-        "한국인 응답 기준",
-        korean["openchat_find"],
-        korean_total,
-    )
-
-    st.markdown("### 외국인 응답 상세")
-    render_rank_section(
-        "외국인 핵심 불편",
-        "외국인 응답 기준",
         foreign["pain"],
+        korean_total,
         foreign_total,
     )
-    render_rank_section(
-        "외국인 오픈채팅 수요",
-        "외국인 응답 기준",
+    render_comparison_section(
+        "오픈채팅에서 찾는 정보",
+        "전체 응답 · 집단별 0~100% 기준",
+        korean["openchat_find"],
         foreign["openchat_find"],
+        korean_total,
         foreign_total,
     )
 

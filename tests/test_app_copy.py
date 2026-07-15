@@ -5,7 +5,12 @@ from pathlib import Path
 from unittest.mock import patch
 
 import app
-from app import field_counter_html, intent_chart_html
+from app import (
+    bar_chart_html,
+    comparison_chart_html,
+    field_counter_html,
+    intent_chart_html,
+)
 
 
 def call_name(call: ast.Call) -> str:
@@ -315,48 +320,53 @@ class AppCopyTest(unittest.TestCase):
         self.assertIn("16명", markup)
         self.assertIn("Google Sheets 실시간 집계", markup)
 
-    def test_overall_rank_sections_use_each_groups_own_total(self) -> None:
+    def test_overall_comparison_sections_use_each_groups_own_total(self) -> None:
         overall = self.functions["render_overall_view"]
-        rank_calls = [
+        comparison_calls = [
             node
             for node in ast.walk(overall)
-            if isinstance(node, ast.Call) and call_name(node) == "render_rank_section"
+            if isinstance(node, ast.Call)
+            and call_name(node) == "render_comparison_section"
         ]
-        binding_by_title = {
-            str(call.args[0].value): (
-                (call.args[2].value.id, str(call.args[2].slice.value)),
-                call.args[3].id,
-            )
-            for call in rank_calls
-            if len(call.args) == 4
-            and isinstance(call.args[0], ast.Constant)
-            and isinstance(call.args[2], ast.Subscript)
-            and isinstance(call.args[2].value, ast.Name)
-            and isinstance(call.args[2].slice, ast.Constant)
-            and isinstance(call.args[3], ast.Name)
-        }
-
-        self.assertEqual(
-            binding_by_title,
-            {
-                "한국인 핵심 불편": (("korean", "pain"), "korean_total"),
-                "한국인 오픈채팅 수요": (
-                    ("korean", "openchat_find"),
-                    "korean_total",
-                ),
-                "외국인 핵심 불편": (("foreign", "pain"), "foreign_total"),
-                "외국인 오픈채팅 수요": (
-                    ("foreign", "openchat_find"),
-                    "foreign_total",
-                ),
-            },
-        )
+        self.assertEqual(len(comparison_calls), 2)
+        titles = {str(call.args[0].value) for call in comparison_calls}
+        self.assertEqual(titles, {"제주에서 불편했던 점", "오픈채팅에서 찾는 정보"})
+        for call in comparison_calls:
+            self.assertEqual(call.args[4].id, "korean_total")
+            self.assertEqual(call.args[5].id, "foreign_total")
+            self.assertEqual(call.args[2].value.id, "korean")
+            self.assertEqual(call.args[3].value.id, "foreign")
         self.assertFalse(
             any(
                 isinstance(node, ast.Call) and call_name(node) == "max"
                 for node in ast.walk(overall)
             )
         )
+
+    def test_bar_chart_uses_group_percentage_scale(self) -> None:
+        markup = bar_chart_html([("버스 노선", 5), ("택시비", 2)], 20, "korean")
+
+        self.assertIn("버스 노선", markup)
+        self.assertIn("5명 · 25.0%", markup)
+        self.assertIn('style="width:25.0%"', markup)
+        self.assertIn("<span>0%</span><span>50%</span><span>100%</span>", markup)
+        self.assertIn("chart-korean", markup)
+
+    def test_comparison_chart_keeps_all_group_rows_and_denominators(self) -> None:
+        markup = comparison_chart_html(
+            [("버스 노선", 11), ("택시비", 10), ("정보 부족", 5)],
+            [("교통", 12), ("버스 노선", 6), ("여행 계획", 4)],
+            23,
+            17,
+        )
+
+        self.assertIn("한국인 응답 · n=23", markup)
+        self.assertIn("외국인 응답 · n=17", markup)
+        for label in ["택시비", "정보 부족", "교통", "여행 계획"]:
+            self.assertIn(label, markup)
+        self.assertIn('style="width:47.8%"', markup)
+        self.assertIn('style="width:70.6%"', markup)
+        self.assertIn("comparison-chart-grid", markup)
 
     def test_overall_view_does_not_repeat_research_conclusion(self) -> None:
         overall = self.functions["render_overall_view"]
