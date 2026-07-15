@@ -1,25 +1,21 @@
 from __future__ import annotations
 
+from datetime import datetime
 from html import escape
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
 import streamlit as st
+import streamlit.components.v1 as components
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfgen import canvas
 
-from src.presentation_pdf import build_presentation_pdf
-from src.research_page import (
-    build_focus_view_model,
-    build_research_view_model,
-    focus_panel_html,
-    research_hero_html,
-)
 from src.survey_dashboard import get_foreign_survey, get_public_survey, pct
-
-
-APP_DIR = Path(__file__).resolve().parent
-QUESTION_PREVIEW = APP_DIR / "assets" / "synapspot-question-preview.png"
-MEETINGS_PREVIEW = APP_DIR / "assets" / "synapspot-meetings-preview.png"
-PUBLIC_RESEARCH_URL = "https://jeju-student-survey-research-preview.streamlit.app/"
 
 
 def apply_page_style() -> None:
@@ -45,8 +41,8 @@ html, body, [data-testid="stAppViewContainer"], .stApp {
 }
 
 .main .block-container {
-    max-width: 1180px;
-    padding: 1.25rem 1rem 4rem;
+    max-width: 880px;
+    padding: 1rem 1rem 4rem;
 }
 
 [data-testid="stHeader"], footer, #MainMenu {
@@ -58,23 +54,19 @@ h1, h2, h3, p {
     letter-spacing: 0;
 }
 
-h1, h2, h3 {
-    scroll-margin-top: 24px;
-}
-
 h1 {
-    font-size: 3rem !important;
+    font-size: 2.65rem !important;
     line-height: 1.15 !important;
     margin-bottom: 0.65rem !important;
 }
 
 h2 {
-    font-size: 2rem !important;
+    font-size: 1.8rem !important;
     margin-top: 1.4rem !important;
 }
 
 h3 {
-    font-size: 1.35rem !important;
+    font-size: 1.3rem !important;
 }
 
 p, li, .stMarkdown, [data-testid="stCaptionContainer"] {
@@ -87,9 +79,16 @@ p, li, .stMarkdown, [data-testid="stCaptionContainer"] {
 
 div[data-testid="stVerticalBlockBorderWrapper"] {
     border-color: var(--ara-line);
-    border-radius: 8px;
+    border-radius: 20px;
     background: var(--ara-card);
-    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.05);
+}
+
+div[data-testid="stVerticalBlockBorderWrapper"]:has(h1) {
+    border-color: #bfdbfe;
+    background:
+        linear-gradient(135deg, rgba(37, 99, 235, 0.08), rgba(20, 184, 166, 0.08)),
+        #ffffff;
 }
 
 div[data-testid="stProgress"] {
@@ -101,14 +100,14 @@ div[data-testid="stProgress"] > div > div {
 }
 
 div[data-testid="stProgress"] > div > div > div {
-    background: var(--ara-teal);
+    background: linear-gradient(90deg, var(--ara-blue), var(--ara-teal));
 }
 
 .stButton > button,
 div.stDownloadButton > button {
     width: 100%;
     min-height: 2.8rem;
-    border-radius: 8px;
+    border-radius: 12px;
     border: 1px solid #cbd5e1;
     background: #ffffff;
     color: var(--ara-text);
@@ -124,13 +123,77 @@ section[data-testid="stSidebar"] {
     display: none;
 }
 
-div[data-testid="stButtonGroup"] {
-    margin: 1rem 0 1.25rem;
+.field-counter {
+    overflow: hidden;
+    margin: 1rem 0 0.75rem;
+    border: 1px solid var(--ara-line);
+    border-radius: 8px;
+    background: var(--ara-card);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
 }
 
-div[data-testid="stButtonGroup"] button {
-    min-height: 3rem;
+.field-total {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.25rem 1.4rem;
+    color: #ffffff;
+    background: #172f57;
+}
+
+.field-label {
+    margin-bottom: 0.25rem;
+    color: #cbdcf6;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.field-number {
+    font-size: 3rem;
     font-weight: 800;
+    line-height: 1;
+}
+
+.field-live {
+    color: #d6fff5;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-align: right;
+}
+
+.field-groups {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.field-group {
+    padding: 1rem 1.4rem;
+}
+
+.field-group + .field-group {
+    border-left: 1px solid var(--ara-line);
+}
+
+.field-group-label {
+    color: var(--ara-muted);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.field-group-value {
+    margin-top: 0.2rem;
+    color: var(--ara-text);
+    font-size: 1.6rem;
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+.field-status {
+    padding: 0.65rem 1.4rem;
+    border-top: 1px solid var(--ara-line);
+    color: var(--ara-muted);
+    font-size: 0.78rem;
 }
 
 @keyframes araFadeUp {
@@ -148,26 +211,54 @@ div[data-testid="stButtonGroup"] button {
     animation: araFadeUp 0.35s ease-out both;
 }
 
-@media (max-width: 680px) {
+@media (max-width: 640px) {
     .main .block-container {
-        padding: 0.75rem 0.75rem 3.5rem;
+        padding: 0.7rem 0.7rem 3.4rem;
     }
 
     div[data-testid="stVerticalBlockBorderWrapper"] {
-        border-radius: 8px;
+        border-radius: 16px;
         box-shadow: 0 8px 20px rgba(15, 23, 42, 0.045);
     }
 
     h1 {
-        font-size: 1.85rem !important;
+        font-size: 2rem !important;
     }
 
     h2 {
-        font-size: 1.35rem !important;
+        font-size: 1.45rem !important;
     }
 
     h3 {
-        font-size: 1.08rem !important;
+        font-size: 1.15rem !important;
+    }
+
+    .field-counter {
+        margin-top: 0.8rem;
+    }
+
+    .field-total {
+        padding: 1rem;
+    }
+
+    .field-number {
+        font-size: 2.5rem;
+    }
+
+    .field-live {
+        max-width: 9rem;
+    }
+
+    .field-group {
+        padding: 0.85rem 1rem;
+    }
+
+    .field-group-value {
+        font-size: 1.45rem;
+    }
+
+    .field-status {
+        padding: 0.6rem 1rem;
     }
 }
 </style>
@@ -192,8 +283,8 @@ def get_count(items: list[tuple[str, int]], label: str, default: int = 0) -> int
     return dict(items).get(label, default)
 
 
-def render_html(html: str, _height: int) -> None:
-    st.html(html)
+def render_html(html: str, height: int) -> None:
+    components.html(html, height=height, scrolling=False)
 
 
 def chart_theme() -> str:
@@ -214,9 +305,11 @@ body {
 .chart-card {
     width: 100%;
     border: 1px solid #dbe4ef;
-    border-radius: 8px;
-    background: #ffffff;
-    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+    border-radius: 20px;
+    background:
+        linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,252,0.96)),
+        #ffffff;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.055);
     padding: clamp(16px, 4vw, 24px);
 }
 
@@ -236,7 +329,7 @@ body {
 
 .summary-card {
     min-height: 126px;
-    border-radius: 8px;
+    border-radius: 18px;
     padding: 16px;
     background: #f8fafc;
     border: 1px solid #e2e8f0;
@@ -251,7 +344,7 @@ body {
     top: 0;
     width: 5px;
     height: 100%;
-    background: #0f766e;
+    background: linear-gradient(180deg, #2563eb, #0f766e);
 }
 
 .summary-label {
@@ -263,7 +356,7 @@ body {
 .summary-value {
     margin-top: 10px;
     color: #172033;
-    font-size: 33px;
+    font-size: clamp(23px, 6vw, 33px);
     line-height: 1.1;
     font-weight: 900;
     overflow-wrap: anywhere;
@@ -305,7 +398,7 @@ body {
     height: 100%;
     min-width: 9px;
     border-radius: 999px;
-    background: #0f766e;
+    background: linear-gradient(90deg, #2563eb, #0f766e);
 }
 
 .bar-value {
@@ -386,10 +479,6 @@ body {
     .summary-card {
         min-height: 118px;
         padding: 14px;
-    }
-
-    .summary-value {
-        font-size: 23px;
     }
 
     .bar-row {
@@ -505,79 +594,49 @@ def intent_chart_html(intent: list[tuple[str, int]], total: int) -> str:
 """
 
 
-def render_research_intro(
-    korean_survey: dict[str, object], foreign_survey: dict[str, object]
-) -> dict[str, object]:
-    model = build_research_view_model(korean_survey, foreign_survey)
-    st.html(research_hero_html(model))
-    st.markdown("## 어떤 문제부터 살펴볼까요?")
-    st.caption("선택하면 관련 설문 근거와 연결된 시냅스팟 기능이 함께 바뀝니다.")
-    focus = st.segmented_control(
-        "발표 주제 선택",
-        ["전체 응답", "이동·동행", "정보 탐색"],
-        default="전체 응답",
-        key="presentation_focus",
-        width="stretch",
-        label_visibility="collapsed",
+def field_counter_html(korean_survey: dict[str, object], foreign_survey: dict[str, object]) -> str:
+    korean_total = int(korean_survey["data"]["n"])
+    foreign_total = int(foreign_survey["data"]["n"])
+    total = korean_total + foreign_total
+    is_live = (
+        korean_survey.get("source") == "Google Sheets"
+        and foreign_survey.get("source") == "Google Sheets"
     )
-    focus_model = build_focus_view_model(model, str(focus or "전체 응답"))
-    st.html(focus_panel_html(focus_model))
-    return focus_model
+    status = "Google Sheets 실시간 집계" if is_live else "저장 데이터 기준 집계"
+    loaded_at = str(korean_survey.get("loaded_at", "확인 불가"))
+    return f"""
+<section class="field-counter" aria-label="현장 응답 현황">
+    <div class="field-total">
+        <div>
+            <div class="field-label">총 응답</div>
+            <div class="field-number">{total}명</div>
+        </div>
+        <div class="field-live">{escape(status)}</div>
+    </div>
+    <div class="field-groups">
+        <div class="field-group">
+            <div class="field-group-label">한국인</div>
+            <div class="field-group-value">{korean_total}명</div>
+        </div>
+        <div class="field-group">
+            <div class="field-group-label">외국인</div>
+            <div class="field-group-value">{foreign_total}명</div>
+        </div>
+    </div>
+    <div class="field-status">마지막 갱신 {escape(loaded_at)} · 실시간 집계는 새로고침 시 반영됩니다.</div>
+</section>
+"""
 
 
-def render_product_preview(focus_model: dict[str, object]) -> None:
-    st.markdown("## 시냅스팟에서는 이렇게 해결합니다")
-    st.caption(
-        f"현재 선택한 ‘{focus_model['focus']}’ 흐름과 연결되는 실제 모바일 화면입니다."
-    )
-
-    preview_lookup = {
-        "meetings": (
-            MEETINGS_PREVIEW,
-            "이동·동행 파티",
-            "모임을 찾고 만들고 신청 상태를 관리합니다.",
-        ),
-        "question": (
-            QUESTION_PREVIEW,
-            "근거 있는 AI 질문",
-            "답변과 함께 출처와 신뢰도를 확인합니다.",
-        ),
-    }
-    selected_asset = focus_model.get("product_asset")
-    if selected_asset in preview_lookup:
-        previews = [preview_lookup[str(selected_asset)]]
-    else:
-        previews = [preview_lookup["meetings"], preview_lookup["question"]]
-
-    columns = st.columns(len(previews))
-    for column, (image_path, title, description) in zip(columns, previews):
-        with column:
-            st.markdown(f"### {title}")
-            st.caption(description)
-            if image_path.exists():
-                st.image(str(image_path), width="stretch")
-            else:
-                st.info("미리보기 이미지를 준비 중입니다.")
-
-
-def render_data_status(korean_survey: dict[str, object], foreign_survey: dict[str, object]) -> None:
-    status_col, refresh_col = st.columns([5, 1])
-    with status_col:
-        st.caption(
-            "데이터 기준 · "
-            f"한국인 {source_label(str(korean_survey.get('source', '')))} · "
-            f"외국인 {source_label(str(foreign_survey.get('source', '')))} · "
-            f"마지막 집계 {korean_survey.get('loaded_at', '-')}"
-        )
-    with refresh_col:
-        if st.button("↻ 새로고침", width="stretch"):
-            st.cache_data.clear()
-            st.rerun()
-
+def render_header(korean_survey: dict[str, object], foreign_survey: dict[str, object]) -> None:
+    st.caption("JEJU EXCHANGE SURVEY")
+    st.title("교류학생 생활 플랫폼 수요조사")
+    st.write("한국인·외국인 학생의 이동, 동행 모집, 오픈채팅 이용 수요를 확인합니다.")
+    st.markdown(field_counter_html(korean_survey, foreign_survey), unsafe_allow_html=True)
     if korean_survey.get("error"):
         st.warning(f"{korean_survey['error']}로 인해 한국인 설문은 저장된 CSV 기준 결과를 표시합니다.")
     elif korean_survey.get("source") != "Google Sheets":
-        st.warning("한국인 설문은 Google Sheets 연결 전까지 저장된 CSV 기준 결과를 표시합니다.")
+        st.warning("Google Sheets 연결 전까지 저장된 CSV 기준 결과를 표시합니다.")
     if foreign_survey.get("error"):
         st.warning(str(foreign_survey["error"]))
 
@@ -679,15 +738,247 @@ def render_comments_section(comments: list[str], key_prefix: str) -> None:
         if total_pages > 1:
             previous_col, page_col, next_col = st.columns([1, 1, 1])
             with previous_col:
-                if st.button("이전", key=f"{key_prefix}_comments_prev", disabled=current_page == 0, width="stretch"):
+                if st.button("이전", key=f"{key_prefix}_comments_prev", disabled=current_page == 0, use_container_width=True):
                     st.session_state[page_key] = current_page - 1
                     st.rerun()
             with page_col:
                 st.markdown(f"<div style='text-align:center; padding-top:0.45rem;'>{current_page + 1} / {total_pages}</div>", unsafe_allow_html=True)
             with next_col:
-                if st.button("다음", key=f"{key_prefix}_comments_next", disabled=current_page >= total_pages - 1, width="stretch"):
+                if st.button("다음", key=f"{key_prefix}_comments_next", disabled=current_page >= total_pages - 1, use_container_width=True):
                     st.session_state[page_key] = current_page + 1
                     st.rerun()
+
+
+PDF_FONT = "HYGothic-Medium"
+PDF_TTF_FONT = "AraKorean"
+PDF_FONT_CANDIDATES = [
+    Path("assets/fonts/NotoSansKR-Regular.ttf"),
+    Path("C:/Windows/Fonts/NotoSansKR-VF.ttf"),
+    Path("C:/Windows/Fonts/malgun.ttf"),
+    Path("/usr/share/fonts/truetype/nanum/NanumGothic.ttf"),
+    Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
+]
+PDF_TEXT = colors.HexColor("#172033")
+PDF_MUTED = colors.HexColor("#64748B")
+PDF_LINE = colors.HexColor("#D8E2EE")
+PDF_BLUE = colors.HexColor("#2563EB")
+PDF_TEAL = colors.HexColor("#0F766E")
+
+
+def register_pdf_font() -> str:
+    if PDF_TTF_FONT in pdfmetrics.getRegisteredFontNames():
+        return PDF_TTF_FONT
+
+    for font_path in PDF_FONT_CANDIDATES:
+        if font_path.exists():
+            try:
+                pdfmetrics.registerFont(TTFont(PDF_TTF_FONT, str(font_path)))
+                return PDF_TTF_FONT
+            except Exception:
+                continue
+
+    if PDF_FONT not in pdfmetrics.getRegisteredFontNames():
+        pdfmetrics.registerFont(UnicodeCIDFont(PDF_FONT))
+    return PDF_FONT
+
+
+def draw_wrapped_text(
+    c: canvas.Canvas,
+    text: str,
+    x: float,
+    y: float,
+    max_width: float,
+    line_height: float,
+    font_name: str,
+    font_size: int,
+    color: colors.Color = PDF_TEXT,
+) -> float:
+    c.setFont(font_name, font_size)
+    c.setFillColor(color)
+    for paragraph in str(text).splitlines() or [""]:
+        current = ""
+        for char in paragraph:
+            candidate = current + char
+            if current and pdfmetrics.stringWidth(candidate, font_name, font_size) > max_width:
+                c.drawString(x, y, current)
+                y -= line_height
+                current = char
+            else:
+                current = candidate
+        if current:
+            c.drawString(x, y, current)
+            y -= line_height
+    return y
+
+
+def draw_pdf_title(c: canvas.Canvas, title: str, subtitle: str, y: float, font_name: str) -> float:
+    c.setFillColor(PDF_TEAL)
+    c.setFont(font_name, 9)
+    c.drawString(42, y, "JEJU NATIONAL UNIVERSITY EXCHANGE STUDENT SURVEY")
+    y -= 28
+    y = draw_wrapped_text(c, title, 42, y, 510, 25, font_name, 22)
+    y -= 8
+    return draw_wrapped_text(c, subtitle, 42, y, 510, 15, font_name, 10, PDF_MUTED) - 18
+
+
+def draw_pdf_section(c: canvas.Canvas, title: str, y: float, font_name: str) -> float:
+    c.setStrokeColor(PDF_LINE)
+    c.line(42, y + 12, 553, y + 12)
+    c.setFillColor(PDF_TEXT)
+    c.setFont(font_name, 16)
+    c.drawString(42, y - 8, title)
+    return y - 34
+
+
+def draw_pdf_metric(c: canvas.Canvas, label: str, value: str, note: str, x: float, y: float, font_name: str) -> None:
+    c.setStrokeColor(PDF_LINE)
+    c.setFillColor(colors.white)
+    c.roundRect(x, y - 70, 118, 70, 10, stroke=1, fill=1)
+    c.setFillColor(PDF_MUTED)
+    c.setFont(font_name, 9)
+    c.drawString(x + 12, y - 19, label)
+    c.setFillColor(PDF_TEXT)
+    c.setFont(font_name, 19)
+    c.drawString(x + 12, y - 43, value)
+    c.setFillColor(PDF_TEAL)
+    c.setFont(font_name, 8)
+    c.drawString(x + 12, y - 59, note)
+
+
+def draw_pdf_rankings(
+    c: canvas.Canvas,
+    title: str,
+    items: list[tuple[str, int]],
+    total: int,
+    x: float,
+    y: float,
+    font_name: str,
+    limit: int = 5,
+) -> float:
+    c.setFillColor(PDF_TEXT)
+    c.setFont(font_name, 12)
+    c.drawString(x, y, title)
+    y -= 19
+    max_value = max([value for _, value in items[:limit]] + [1])
+    for label, value in items[:limit]:
+        ratio = value / max_value if max_value else 0
+        c.setFillColor(PDF_TEXT)
+        c.setFont(font_name, 9)
+        c.drawString(x, y, str(label)[:22])
+        c.setFillColor(colors.HexColor("#E8EEF5"))
+        c.roundRect(x + 118, y - 1, 92, 6, 3, stroke=0, fill=1)
+        c.setFillColor(PDF_TEAL)
+        c.roundRect(x + 118, y - 1, 92 * ratio, 6, 3, stroke=0, fill=1)
+        c.setFillColor(PDF_MUTED)
+        c.drawRightString(x + 250, y, f"{value}명 · {pct(value, total)}")
+        y -= 18
+    return y - 10
+
+
+def draw_pdf_comments(c: canvas.Canvas, comments: list[str], x: float, y: float, font_name: str, limit: int = 5) -> float:
+    c.setFillColor(PDF_TEXT)
+    c.setFont(font_name, 12)
+    c.drawString(x, y, "익명 자유 의견")
+    y -= 18
+    if not comments:
+        c.setFillColor(PDF_MUTED)
+        c.setFont(font_name, 9)
+        c.drawString(x, y, "표시할 자유 의견이 없습니다.")
+        return y - 18
+    for index, comment in enumerate(comments[:limit], start=1):
+        y = draw_wrapped_text(c, f"{index}. {comment}", x, y, 495, 13, font_name, 8, PDF_TEXT)
+        y -= 4
+    if len(comments) > limit:
+        c.setFillColor(PDF_MUTED)
+        c.setFont(font_name, 8)
+        c.drawString(x, y, f"외 {len(comments) - limit}개 의견은 사이트의 익명 자유 의견 페이지에서 확인할 수 있습니다.")
+        y -= 14
+    return y
+
+
+def draw_survey_pdf_page(c: canvas.Canvas, title: str, data: dict[str, Any], source: str, loaded_at: str, font_name: str) -> None:
+    total = int(data["n"])
+    top_pain = data["pain"][0] if data["pain"] else ("-", 0)
+    top_openchat = data["openchat_find"][0] if data["openchat_find"] else ("-", 0)
+    positive = get_count(data["intent"], "긍정")
+
+    y = draw_pdf_title(c, title, f"응답 {total}명 · 데이터 소스 {source_label(source)} · 마지막 갱신 {loaded_at}", 800, font_name)
+    draw_pdf_metric(c, "응답 수", f"{total}명", "현재 집계 기준", 42, y, font_name)
+    draw_pdf_metric(c, "불편 1순위", str(top_pain[0]), f"{top_pain[1]}명", 172, y, font_name)
+    draw_pdf_metric(c, "오픈채팅 1순위", str(top_openchat[0]), f"{top_openchat[1]}명", 302, y, font_name)
+    draw_pdf_metric(c, "사용 의향", f"{positive}명", f"긍정 {pct(positive, total)}", 432, y, font_name)
+
+    y -= 100
+    y = draw_pdf_section(c, "주요 응답", y, font_name)
+    left_y = draw_pdf_rankings(c, "제주에서 불편했던 점", data["pain"], total, 42, y, font_name)
+    right_y = draw_pdf_rankings(c, "오픈채팅에서 찾는 정보", data["openchat_find"], total, 315, y, font_name)
+    y = min(left_y, right_y) - 4
+    left_y = draw_pdf_rankings(c, "같이 하고 싶은 활동", data["activity"], total, 42, y, font_name)
+    right_y = draw_pdf_rankings(c, "오픈채팅에서 불편한 점", data["openchat_pain"], total, 315, y, font_name)
+    y = min(left_y, right_y) - 4
+    y = draw_pdf_section(c, "익명 의견", y, font_name)
+    draw_pdf_comments(c, data.get("comments", []), 42, y, font_name)
+
+
+def build_current_pdf(korean_survey: dict[str, Any], foreign_survey: dict[str, Any]) -> bytes:
+    font_name = register_pdf_font()
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+
+    korean = korean_survey["data"]
+    foreign = foreign_survey["data"]
+    generated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+    korean_total = int(korean["n"])
+    foreign_total = int(foreign["n"])
+    korean_top = korean["openchat_find"][0] if korean["openchat_find"] else ("-", 0)
+    foreign_top = foreign["openchat_find"][0] if foreign["openchat_find"] else ("-", 0)
+
+    y = draw_pdf_title(c, "제주대학교 교류학생 생활 플랫폼 수요조사", f"생성 시각 {generated_at} · 한국인/외국인 설문 집계 요약", 800, font_name)
+    draw_pdf_metric(c, "전체 응답", f"{korean_total + foreign_total}명", "한국인 + 외국인", 42, y, font_name)
+    draw_pdf_metric(c, "한국인 응답", f"{korean_total}명", f"주요 수요 {korean_top[0]}", 172, y, font_name)
+    draw_pdf_metric(c, "외국인 응답", f"{foreign_total}명", f"주요 수요 {foreign_top[0]}", 302, y, font_name)
+    draw_pdf_metric(c, "공통 방향", "이동/동행", "모집과 정보 탐색", 432, y, font_name)
+    y -= 105
+    y = draw_pdf_section(c, "데이터 기준", y, font_name)
+    y = draw_wrapped_text(c, f"한국인 설문: {source_label(str(korean_survey.get('source', '')))} · {korean_survey.get('loaded_at', '-')}", 42, y, 500, 15, font_name, 10)
+    y = draw_wrapped_text(c, f"외국인 설문: {source_label(str(foreign_survey.get('source', '')))} · {foreign_survey.get('loaded_at', '-')}", 42, y, 500, 15, font_name, 10)
+    y -= 14
+    y = draw_pdf_section(c, "한눈에 보는 결론", y, font_name)
+    draw_wrapped_text(
+        c,
+        f"한국인 설문은 {korean_top[0]}, 외국인 설문은 {foreign_top[0]} 수요가 두드러집니다. "
+        "PDF는 다운로드 시점의 앱 집계 데이터를 기준으로 생성되며, 개인 식별 정보와 원본 응답 행은 포함하지 않습니다.",
+        42,
+        y,
+        500,
+        16,
+        font_name,
+        10,
+    )
+    c.showPage()
+
+    draw_survey_pdf_page(
+        c,
+        "한국인 설문 요약",
+        korean,
+        str(korean_survey.get("source", "")),
+        str(korean_survey.get("loaded_at", "-")),
+        font_name,
+    )
+    c.showPage()
+
+    draw_survey_pdf_page(
+        c,
+        "외국인 설문 요약",
+        foreign,
+        str(foreign_survey.get("source", "")),
+        str(foreign_survey.get("loaded_at", "-")),
+        font_name,
+    )
+    c.showPage()
+
+    c.save()
+    return buffer.getvalue()
 
 
 def render_downloads(korean_survey: dict[str, Any], foreign_survey: dict[str, Any]) -> None:
@@ -696,16 +987,10 @@ def render_downloads(korean_survey: dict[str, Any], foreign_survey: dict[str, An
         st.write("개별 응답과 원본 대화는 공개하지 않고, 현재 집계 결과와 익명 자유 의견 일부만 표시합니다.")
         st.download_button(
             "현재 데이터로 PDF 내려받기",
-            data=build_presentation_pdf(
-                korean_survey,
-                foreign_survey,
-                question_preview=QUESTION_PREVIEW,
-                meetings_preview=MEETINGS_PREVIEW,
-                public_url=PUBLIC_RESEARCH_URL,
-            ),
+            data=build_current_pdf(korean_survey, foreign_survey),
             file_name="jeju-student-survey-live-report.pdf",
             mime="application/pdf",
-            width="stretch",
+            use_container_width=True,
         )
         st.caption("PDF는 다운로드 버튼을 누르는 시점의 한국인/외국인 설문 집계를 기준으로 생성됩니다.")
 
@@ -793,7 +1078,7 @@ def render_overall_view(korean_survey: dict[str, object], foreign_survey: dict[s
         st.markdown("### 한눈에 보는 결론")
         st.write(
             f"한국인 응답에서는 **{korean_top_pain[0]}**, 외국인 응답에서는 **{foreign_top_pain[0]}** 문제가 크게 보입니다. "
-            f"오픈채팅에서는 한국인 학생에게 **{korean_top_openchat[0]}**, 외국인 학생에게 **{foreign_top_openchat[0]}** 수요가 많이 나타났어요. "
+            f"오픈채팅에서는 한국인 학생은 **{korean_top_openchat[0]}**, 외국인 학생은 **{foreign_top_openchat[0]}**을 많이 찾고 있어요. "
             "따라서 첫 서비스 검증은 실시간 이동/동행 모집을 중심으로 두고, 외국인 학생에게는 공지/생활정보 탐색을 함께 보강하는 방향이 좋습니다."
         )
 
@@ -805,18 +1090,17 @@ def render_survey_dashboard() -> None:
     st.set_page_config(
         page_title="제주대학교 교류학생 생활 플랫폼 수요조사",
         page_icon="📊",
-        layout="wide",
+        layout="centered",
     )
     apply_page_style()
 
     korean_survey = get_public_survey()
     foreign_survey = get_foreign_survey()
 
-    focus_model = render_research_intro(korean_survey, foreign_survey)
-    render_product_preview(focus_model)
-    render_data_status(korean_survey, foreign_survey)
-    st.markdown("## 전체 데이터 살펴보기")
-    st.caption("발표 흐름에서 다룬 근거와 전체 응답 항목을 직접 비교할 수 있습니다.")
+    render_header(korean_survey, foreign_survey)
+    if st.button("데이터 새로고침", use_container_width=True):
+        st.cache_data.clear()
+        st.rerun()
     selected_view = st.radio(
         "보기 선택",
         ["전체 요약", "한국인 설문", "외국인 설문", "비교 요약"],
