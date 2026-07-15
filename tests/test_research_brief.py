@@ -1,9 +1,17 @@
 import re
 import unittest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
-from src.research_brief import build_brief_context, ranked_metrics
-from src.research_brief import comparison_html, findings_html, intro_html
+from src.research_brief import (
+    build_brief_context,
+    comparison_html,
+    findings_html,
+    image_data_uri,
+    intro_html,
+    product_bridge_html,
+    ranked_metrics,
+)
 
 
 def survey(total: int, *, source: str, loaded_at: str, pain=None, openchat_find=None, openchat_pain=None):
@@ -119,6 +127,63 @@ class ResearchBriefHtmlTest(unittest.TestCase):
         self.assertIn("&lt;strong&gt;택시팟&lt;/strong&gt;", markup)
         self.assertIn("&lt;b&gt;source&lt;/b&gt;", markup)
         self.assertIn("&lt;time&gt;", markup)
+
+
+class ProductBridgeTest(unittest.TestCase):
+    def setUp(self):
+        korean = survey(4, source="Google Sheets", loaded_at="2026-07-15 15:00")
+        foreign = survey(3, source="Google Sheets", loaded_at="2026-07-15 15:01")
+        self.context = build_brief_context(korean, foreign)
+
+    def test_png_is_encoded_as_data_uri(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "screen.png"
+            path.write_bytes(b"\x89PNG\r\n\x1a\nexample")
+
+            uri = image_data_uri(path)
+
+        self.assertTrue(uri.startswith("data:image/png;base64,"))
+        self.assertNotIn("example", uri)
+
+    def test_non_png_path_is_not_embedded(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / "screen.jpg"
+            path.write_bytes(b"not-a-png")
+
+            self.assertEqual(image_data_uri(path), "")
+
+    def test_missing_images_keep_feature_copy_without_broken_image(self):
+        markup = product_bridge_html(
+            self.context, Path("missing-a.png"), Path("missing-b.png")
+        )
+
+        self.assertIn("이동·동행 파티", markup)
+        self.assertIn("근거 있는 정보 탐색", markup)
+        self.assertNotIn("<img", markup)
+
+    def test_bridge_is_rendered_once_with_restrained_research_claim(self):
+        with TemporaryDirectory() as directory:
+            meetings = Path(directory) / "meetings.png"
+            question = Path(directory) / "question.png"
+            meetings.write_bytes(b"\x89PNG\r\n\x1a\nmeetings")
+            question.write_bytes(b"\x89PNG\r\n\x1a\nquestion")
+
+            markup = product_bridge_html(self.context, meetings, question)
+
+        self.assertEqual(markup.count('class="research-product-bridge"'), 1)
+        self.assertEqual(markup.count("<img"), 2)
+        self.assertIn("문제의 우선순위를 정하는 근거", markup)
+        self.assertIn("기능의 효과를 입증한 것이 아니라", markup)
+
+    def test_no_data_omits_product_bridge(self):
+        korean = survey(0, source="CSV", loaded_at="2026-07-15 15:00")
+        foreign = survey(0, source="CSV", loaded_at="2026-07-15 15:01")
+        context = build_brief_context(korean, foreign)
+
+        self.assertEqual(
+            product_bridge_html(context, Path("missing-a.png"), Path("missing-b.png")),
+            "",
+        )
 
 
 class ResearchBriefCssTest(unittest.TestCase):

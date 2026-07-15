@@ -21,11 +21,18 @@ from src.research_brief import (
     comparison_html,
     findings_html,
     intro_html,
+    product_bridge_html,
 )
 from src.survey_dashboard import get_foreign_survey, get_public_survey, pct
 
 
 RESEARCH_CSS_PATH = Path(__file__).parent / "assets" / "research-brief.css"
+MEETINGS_PREVIEW = (
+    Path(__file__).parent / "assets" / "synapspot-meetings-preview.png"
+)
+QUESTION_PREVIEW = (
+    Path(__file__).parent / "assets" / "synapspot-question-preview.png"
+)
 
 
 def apply_page_style() -> None:
@@ -660,13 +667,9 @@ def render_research_findings(context: BriefContext) -> None:
 
 
 def render_product_bridge(context: BriefContext) -> None:
-    if not context.has_data:
-        return
-    st.markdown(
-        '<section class="research-product-bridge"><p>FROM RESEARCH TO PRODUCT</p>'
-        '<h2>이 근거가 시냅스팟의 두 기능으로 이어졌습니다.</h2></section>',
-        unsafe_allow_html=True,
-    )
+    markup = product_bridge_html(context, MEETINGS_PREVIEW, QUESTION_PREVIEW)
+    if markup:
+        st.markdown(markup, unsafe_allow_html=True)
 
 
 def render_summary(data: dict[str, object], total: int) -> None:

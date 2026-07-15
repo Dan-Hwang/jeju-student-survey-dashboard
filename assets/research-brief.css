@@ -41,6 +41,15 @@
 .research-compare span { color: var(--research-muted); font-size: 12px; }
 .research-compare strong { display: block; margin-top: 5px; font-size: 20px; }
 .research-interpretation { margin: 14px 0 0; color: var(--research-muted); }
+.research-product-bridge { max-width: 960px; margin: 0 auto; padding: 34px 28px; border-radius: 8px; background: var(--research-bridge); color: var(--research-bg); }
+.research-product-bridge h2 { max-width: 680px; margin: 8px 0; color: var(--research-bg); font-size: 28px; }
+.research-product-bridge > p:not(.research-kicker) { color: var(--research-line); }
+.research-product-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 20px; }
+.research-product-feature { overflow: hidden; border: 1px solid var(--research-muted); border-radius: 8px; background: var(--research-navy); }
+.research-product-feature img { display: block; width: 100%; aspect-ratio: 9 / 16; background: var(--research-bg); object-fit: contain; object-position: top; }
+.research-product-feature > div { padding: 14px; }
+.research-product-feature h3 { margin: 0; color: var(--research-bg); font-size: 18px; }
+.research-product-feature p { margin: 6px 0 0; color: var(--research-line); }
 @media (max-width: 640px) {
   .research-hero { padding-top: 16px; }
   .research-hero h1 { font-size: 32px; }
@@ -53,6 +62,8 @@
   .research-two-column, .research-compare { grid-template-columns: 1fr; }
   .research-heading { align-items: start; flex-direction: column; }
   .research-bar-row { grid-template-columns: 82px 1fr 78px; }
+  .research-product-bridge { padding: 26px 16px; }
+  .research-product-grid { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: no-preference) {
   .research-bar-fill { animation: research-fill .45s ease-out both; transform-origin: left; }

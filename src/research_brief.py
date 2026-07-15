@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from base64 import b64encode
 from dataclasses import dataclass
 from html import escape
+from pathlib import Path
 from typing import Any, Iterable
 
 
@@ -157,4 +159,50 @@ def comparison_html(context: BriefContext) -> str:
     <div><span>외국인 · n={context.foreign.total}</span><strong>{escape(foreign_top)}</strong></div>
   </div>
   <p class="research-interpretation">두 집단 모두 사람과 정보를 제때 찾기 어렵다는 공통 문제를 보였습니다.</p>
+</section>'''
+
+
+def image_data_uri(path: Path) -> str:
+    if not path.is_file() or path.suffix.lower() != ".png":
+        return ""
+    try:
+        image_bytes = path.read_bytes()
+    except OSError:
+        return ""
+    if not image_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+        return ""
+    encoded = b64encode(image_bytes).decode("ascii")
+    return f"data:image/png;base64,{encoded}"
+
+
+def _feature(title: str, description: str, image_uri: str, alt: str) -> str:
+    image = f'<img src="{image_uri}" alt="{escape(alt)}">' if image_uri else ""
+    return f'''<article class="research-product-feature">
+  {image}
+  <div><h3>{escape(title)}</h3><p>{escape(description)}</p></div>
+</article>'''
+
+
+def product_bridge_html(
+    context: BriefContext, meetings_path: Path, question_path: Path
+) -> str:
+    if not context.has_data:
+        return ""
+    meetings = _feature(
+        "이동·동행 파티",
+        "시간, 목적지, 인원을 기준으로 함께 이동할 사람을 찾습니다.",
+        image_data_uri(meetings_path),
+        "시냅스팟 이동·동행 파티 모바일 화면",
+    )
+    question = _feature(
+        "근거 있는 정보 탐색",
+        "공지와 생활정보를 질문하고 답변의 출처를 확인합니다.",
+        image_data_uri(question_path),
+        "시냅스팟 근거 있는 정보 탐색 모바일 화면",
+    )
+    return f'''<section class="research-product-bridge">
+  <p class="research-kicker">FROM RESEARCH TO PRODUCT</p>
+  <h2>이 근거가 시냅스팟의 두 기능으로 이어졌습니다.</h2>
+  <p>설문이 기능의 효과를 입증한 것이 아니라, 구현할 문제의 우선순위를 정하는 근거로 사용됐습니다.</p>
+  <div class="research-product-grid">{meetings}{question}</div>
 </section>'''
