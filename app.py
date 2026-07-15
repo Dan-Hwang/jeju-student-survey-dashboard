@@ -799,11 +799,11 @@ PDF_FONT_CANDIDATES = [
     Path("/usr/share/fonts/truetype/nanum/NanumGothic.ttf"),
     Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
 ]
-PDF_TEXT = colors.HexColor("#172033")
-PDF_MUTED = colors.HexColor("#64748B")
-PDF_LINE = colors.HexColor("#D8E2EE")
-PDF_BLUE = colors.HexColor("#2563EB")
-PDF_TEAL = colors.HexColor("#0F766E")
+PDF_TEXT = colors.HexColor("#13233D")
+PDF_MUTED = colors.HexColor("#66768A")
+PDF_LINE = colors.HexColor("#D8E2E9")
+PDF_BLUE = colors.HexColor("#EC6A5F")
+PDF_TEAL = colors.HexColor("#087F72")
 
 
 def register_pdf_font() -> str:
@@ -963,14 +963,20 @@ def draw_survey_pdf_page(c: canvas.Canvas, title: str, data: dict[str, Any], sou
 
 def build_current_pdf(korean_survey: dict[str, Any], foreign_survey: dict[str, Any]) -> bytes:
     font_name = register_pdf_font()
-    buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=A4)
-
     korean = korean_survey["data"]
     foreign = foreign_survey["data"]
-    generated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
     korean_total = int(korean["n"])
     foreign_total = int(foreign["n"])
+
+    buffer = BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    c.setTitle("Jeju Exchange Student Survey Research Brief")
+    c.setSubject(
+        f"total={korean_total + foreign_total}; korean={korean_total}; foreign={foreign_total}; "
+        f"korean_source={korean_survey.get('source', '')}; foreign_source={foreign_survey.get('source', '')}"
+    )
+
+    generated_at = datetime.now().strftime("%Y-%m-%d %H:%M")
     korean_top = korean["openchat_find"][0] if korean["openchat_find"] else ("-", 0)
     foreign_top = foreign["openchat_find"][0] if foreign["openchat_find"] else ("-", 0)
 
@@ -987,7 +993,7 @@ def build_current_pdf(korean_survey: dict[str, Any], foreign_survey: dict[str, A
     y = draw_pdf_section(c, "한눈에 보는 결론", y, font_name)
     draw_wrapped_text(
         c,
-        f"한국인 설문은 {korean_top[0]}, 외국인 설문은 {foreign_top[0]} 수요가 두드러집니다. "
+        "이동·동행 모집과 신뢰할 수 있는 생활정보 탐색이 함께 필요했습니다. "
         "PDF는 다운로드 시점의 앱 집계 데이터를 기준으로 생성되며, 개인 식별 정보와 원본 응답 행은 포함하지 않습니다.",
         42,
         y,
