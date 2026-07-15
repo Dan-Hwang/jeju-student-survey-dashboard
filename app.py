@@ -55,18 +55,18 @@ h1, h2, h3, p {
 }
 
 h1 {
-    font-size: clamp(1.85rem, 8vw, 3rem) !important;
+    font-size: 2.65rem !important;
     line-height: 1.15 !important;
     margin-bottom: 0.65rem !important;
 }
 
 h2 {
-    font-size: clamp(1.35rem, 6vw, 2rem) !important;
+    font-size: 1.8rem !important;
     margin-top: 1.4rem !important;
 }
 
 h3 {
-    font-size: clamp(1.08rem, 4.5vw, 1.35rem) !important;
+    font-size: 1.3rem !important;
 }
 
 p, li, .stMarkdown, [data-testid="stCaptionContainer"] {
@@ -123,6 +123,79 @@ section[data-testid="stSidebar"] {
     display: none;
 }
 
+.field-counter {
+    overflow: hidden;
+    margin: 1rem 0 0.75rem;
+    border: 1px solid var(--ara-line);
+    border-radius: 8px;
+    background: var(--ara-card);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06);
+}
+
+.field-total {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 1.25rem 1.4rem;
+    color: #ffffff;
+    background: #172f57;
+}
+
+.field-label {
+    margin-bottom: 0.25rem;
+    color: #cbdcf6;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.field-number {
+    font-size: 3rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.field-live {
+    color: #d6fff5;
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-align: right;
+}
+
+.field-groups {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.field-group {
+    padding: 1rem 1.4rem;
+}
+
+.field-group + .field-group {
+    border-left: 1px solid var(--ara-line);
+}
+
+.field-group-label {
+    color: var(--ara-muted);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.field-group-value {
+    margin-top: 0.2rem;
+    color: var(--ara-text);
+    font-size: 1.6rem;
+    font-weight: 800;
+    line-height: 1.2;
+}
+
+.field-status {
+    padding: 0.65rem 1.4rem;
+    border-top: 1px solid var(--ara-line);
+    color: var(--ara-muted);
+    font-size: 0.78rem;
+}
+
 @keyframes araFadeUp {
     from {
         opacity: 0;
@@ -146,6 +219,46 @@ section[data-testid="stSidebar"] {
     div[data-testid="stVerticalBlockBorderWrapper"] {
         border-radius: 16px;
         box-shadow: 0 8px 20px rgba(15, 23, 42, 0.045);
+    }
+
+    h1 {
+        font-size: 2rem !important;
+    }
+
+    h2 {
+        font-size: 1.45rem !important;
+    }
+
+    h3 {
+        font-size: 1.15rem !important;
+    }
+
+    .field-counter {
+        margin-top: 0.8rem;
+    }
+
+    .field-total {
+        padding: 1rem;
+    }
+
+    .field-number {
+        font-size: 2.5rem;
+    }
+
+    .field-live {
+        max-width: 9rem;
+    }
+
+    .field-group {
+        padding: 0.85rem 1rem;
+    }
+
+    .field-group-value {
+        font-size: 1.45rem;
+    }
+
+    .field-status {
+        padding: 0.6rem 1rem;
     }
 }
 </style>
@@ -481,24 +594,51 @@ def intent_chart_html(intent: list[tuple[str, int]], total: int) -> str:
 """
 
 
-def render_header(korean_survey: dict[str, object], foreign_survey: dict[str, object]) -> None:
+def field_counter_html(korean_survey: dict[str, object], foreign_survey: dict[str, object]) -> str:
     korean_total = int(korean_survey["data"]["n"])
     foreign_total = int(foreign_survey["data"]["n"])
-    with st.container(border=True):
-        st.caption("JEJU EXCHANGE SURVEY")
-        st.title("교류학생 생활 플랫폼 수요조사")
-        st.write(
-            "한국인 학생 설문과 외국인 학생 설문을 함께 보며, 이동/동행 모집/오픈채팅 이용 불편을 비교합니다."
-        )
-        st.caption(
-            f"한국인 {korean_total}명 · 외국인 {foreign_total}명 · 마지막 갱신 {korean_survey['loaded_at']}"
-        )
-        if korean_survey.get("error"):
-            st.warning(f"{korean_survey['error']}로 인해 한국인 설문은 저장된 CSV 기준 결과를 표시합니다.")
-        elif korean_survey.get("source") != "Google Sheets":
-            st.warning("Google Sheets 연결 전까지 저장된 CSV 기준 결과를 표시합니다.")
-        if foreign_survey.get("error"):
-            st.warning(str(foreign_survey["error"]))
+    total = korean_total + foreign_total
+    is_live = (
+        korean_survey.get("source") == "Google Sheets"
+        and foreign_survey.get("source") == "Google Sheets"
+    )
+    status = "Google Sheets 실시간 집계" if is_live else "저장 데이터 기준 집계"
+    loaded_at = str(korean_survey.get("loaded_at", "확인 불가"))
+    return f"""
+<section class="field-counter" aria-label="현장 응답 현황">
+    <div class="field-total">
+        <div>
+            <div class="field-label">총 응답</div>
+            <div class="field-number">{total}명</div>
+        </div>
+        <div class="field-live">{escape(status)}</div>
+    </div>
+    <div class="field-groups">
+        <div class="field-group">
+            <div class="field-group-label">한국인</div>
+            <div class="field-group-value">{korean_total}명</div>
+        </div>
+        <div class="field-group">
+            <div class="field-group-label">외국인</div>
+            <div class="field-group-value">{foreign_total}명</div>
+        </div>
+    </div>
+    <div class="field-status">마지막 갱신 {escape(loaded_at)} · 실시간 집계는 새로고침 시 반영됩니다.</div>
+</section>
+"""
+
+
+def render_header(korean_survey: dict[str, object], foreign_survey: dict[str, object]) -> None:
+    st.caption("JEJU EXCHANGE SURVEY")
+    st.title("교류학생 생활 플랫폼 수요조사")
+    st.write("한국인·외국인 학생의 이동, 동행 모집, 오픈채팅 이용 수요를 확인합니다.")
+    st.markdown(field_counter_html(korean_survey, foreign_survey), unsafe_allow_html=True)
+    if korean_survey.get("error"):
+        st.warning(f"{korean_survey['error']}로 인해 한국인 설문은 저장된 CSV 기준 결과를 표시합니다.")
+    elif korean_survey.get("source") != "Google Sheets":
+        st.warning("Google Sheets 연결 전까지 저장된 CSV 기준 결과를 표시합니다.")
+    if foreign_survey.get("error"):
+        st.warning(str(foreign_survey["error"]))
 
 
 def render_summary(data: dict[str, object], total: int) -> None:
